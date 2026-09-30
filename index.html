@@ -265,7 +265,7 @@ function row(s,it){
  if(completing===it.id+PK){
   const n=el('input',{placeholder:'Nota importante (facoltativa)'}),w=el('input',{placeholder:'Chi l\'ha fatto',value:name});
   b.append(el('div',{class:'row',style:'margin-top:6px'},w,n),el('div',{class:'row',style:'margin-top:6px'},
-   el('button',{class:'p',type:'button',onclick:()=>{const by=w.value.trim();if(by&&!name){name=by;try{localStorage.setItem('nome',name)}catch(e){}renderMe()}
+   el('button',{class:'p',type:'button',onclick:()=>{const by=w.value.trim();
     upd(it.id,{log:[...(it.log||[]),{by,at:Date.now(),p:PK,n:n.value.trim()}]});completing=null}},'Segna come fatto'),
    el('button',{class:'x',type:'button',onclick:()=>{completing=null;render()}},'Annulla')));
  }
@@ -281,7 +281,6 @@ function row(s,it){
   const o=s.kind==='client'?ST_C:ST_B;const sel=el('select',{style:'width:auto;font-size:13px;padding:4px'});o.forEach(v=>sel.append(el('option',{value:v},v)));sel.value=it.status||o[0];
   sel.onchange=()=>upd(it.id,{status:sel.value});acts.append(sel);
  }
- let armed=false;
  if(s.kind==='note')acts.append(el('button',{class:'x',onclick:()=>upd(it.id,{pin:!it.pin})},it.pin?'📌 Stacca':'📌 Fissa'));
  acts.append(el('button',{class:'x',onclick:()=>{editing=it.id;render()}},'Modifica'),
   el('button',{class:'x',onclick:async()=>{if(await confirmBox('Eliminare?',[el('p',{},el('b',{},title)),s.kind==='task'&&(it.log||[]).length?'Si perde anche lo storico delle volte in cui è stato fatto.':'Non si può annullare.'],'Elimina',true))del(it.id)}},'Elimina'));
@@ -440,17 +439,6 @@ async function syncCond(){let n=0;for(const e of items.filter(i=>i.kind==='event
  const r=items.find(t=>t.kind==='task'&&t.freq==='window'&&t.start&&t.due&&/rdr|riassort/i.test(t.text)&&t.grp&&(t.grp.toLowerCase()===ti||ti.includes(t.grp.toLowerCase())||t.grp.toLowerCase().includes(ti)));
  if(r){try{await db.doc('items/'+e.id).update({cstart:r.start,cend:r.due});n++}catch(x){}}}
  if(n)toast('Aggiornate '+n+' promo con le date delle condizioni favorevoli (dall\'RDR)')}
-function whoBox(){
- const F=el('form',{},el('h2',{},'Chi sei?'));
- if(!started){F.append(el('div',{class:'m'},'Carico…'));return F}
- F.append(el('div',{class:'m'},'Scegli il tuo nome per entrare: firmerà tutto ciò che aggiungi.'));
- const pick=(n,sd)=>{name=n;if(sd){if(uid&&sd.uid!==uid)upd(sd.id,{uid})}else save('s'+Date.now(),{kind:'staff',name:n,uid:uid||'',active:true,role:'Libraia',ts:Date.now()});needWho=false;renderMe();render()};
- const L=staff(),seen=new Set(),me=uid&&L.find(x=>x.uid===uid);
- if(me)F.append(el('button',{class:'p',type:'button',style:'margin:6px 0;width:100%',onclick:()=>pick(me.name,me)},'Continua come '+me.name));
- L.filter(x=>!seen.has(x.name)&&seen.add(x.name)).forEach(x=>F.append(el('button',{class:'chip',type:'button',style:'display:block;width:100%;margin:4px 0;padding:12px',onclick:()=>pick(x.name,x)},x.name+(x.role==='Area manager'?' · Area manager':''))));
- const inp=el('input',{placeholder:L.length?'Non ci sei? Scrivi il tuo nome':'Scrivi il tuo nome'});
- F.append(inp,el('button',{class:'x',type:'button',onclick:()=>{const n=inp.value.trim();if(n)pick(n,L.find(x=>x.name===n)||null)}},'Aggiungimi ed entra'));
- return F}
 function renderSettings(m){
  const grp=(ic,t,sub,...k)=>{const c=el('div',{class:'set'},el('h2',{},el('span',{class:'ic'},ic),t),sub?el('p',{class:'sub'},sub):null,...k);m.append(c);return c};
  const opt=(l,h,...k)=>el('div',{class:'opt'},el('div',{class:'l'},l),h?el('div',{class:'h'},h):null,...k);
@@ -514,11 +502,12 @@ async function restoreFile(f){
   el('p',{class:'m'},'Niente viene cancellato: ciò che è nell\'app e non nel backup resta com\'è.')],
   buttons:[{label:'Annulla',value:false},{label:'Ripristina '+L.length+' voci',value:true,cls:'p'}],cancelValue:false});
  if(!ok)return;
- let bar,pdEl;dialog({title:'Ripristino in corso…',body:[el('p',{},'Invio le voci al foglio Google, non chiudere l\'app.'),bar=el('div',{class:'prog'},el('i'))],buttons:[],locked:true,onopen:d=>pdEl=d});
- const jobs=L.map(({id,...r})=>[id,r]);let done=0,ok2=0,fail=0;
- for(const [id,r] of jobs){try{await db.doc('items/'+id).set(r);ok2++}catch(e){fail++}done++;bar.firstChild.style.width=Math.round(done*100/jobs.length)+'%'}
+ let bar,pdEl,txt;dialog({title:'Ripristino in corso…',body:[txt=el('p',{},'Invio le voci al foglio Google, non chiudere l\'app.'),bar=el('div',{class:'prog'},el('i'))],buttons:[],locked:true,onopen:d=>pdEl=d});
+ teamAuth.bulk(L.map(({id,...r})=>({op:'set',path:'items/'+id,data:r})));
+ let err=null;
+ try{await teamAuth.waitSync((done,tot)=>{bar.firstChild.style.width=Math.round(done*100/tot)+'%';txt.textContent='Inviate '+done+' voci su '+tot+'…'})}catch(e){err=e}
  if(pdEl){pdEl.close();pdEl.remove()}
- await dialog({title:fail?'Ripristino con errori':'Ripristino completato',body:fail?ok2+' voci ripristinate, '+fail+' non riuscite. Riprova più tardi.':ok2+' voci ripristinate.'});
+ await dialog({title:err?'Ripristino non completato':'Ripristino completato',body:err?'Il foglio ha rifiutato alcune voci ('+(err.message||'errore')+'). Le altre sono state salvate.':L.length+' voci salvate nel foglio.'});
 }
 function renderOggi(m){
  const t=today(),D=vd||t;REF=D;const dt=new Date(D+'T00:00:00'),dow=dt.getDay(),S=SEC.compiti,in7=addD(t,7),T=items.filter(i=>i.kind==='task');
@@ -577,6 +566,7 @@ function renderStorico(m){
   L.forEach(x=>m.append(el('div',{class:'card'},el('div',{class:'b'},el('div',{class:'t'},x.t),el('div',{class:'m'},(x.by?x.by+' · ':'')+new Date(x.at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})),x.n?el('div',{class:'m'},'📝 '+x.n):null))));
   m.append(el('button',{class:'x',type:'button',onclick:()=>{vd=hs;tab='oggi';render()}},'Apri questo giorno →'))}
 }
+document.addEventListener('focusout',()=>{if(pending){pending=false;setTimeout(render,0)}});
 function render(){
  REF=null;
  const nav=document.getElementById('nav');nav.replaceChildren();nav.style.display=needWho?'none':'';
@@ -589,7 +579,6 @@ function render(){
  let dl=document.getElementById('staffl');if(!dl){dl=el('datalist',{id:'staffl'});document.body.append(dl)}dl.replaceChildren(...staff().filter(x=>x.role!=='Area manager').map(x=>el('option',{value:x.name})));
  const m=document.getElementById('main');m.replaceChildren();
  if(!db){m.append(el('p',{class:'empty'},'Collegamento al foglio Google non disponibile.'));return}
- if(needWho){m.append(whoBox());return}
  if(tab==='impostazioni'){renderSettings(m);return}
  if(tab==='oggi'){renderOggi(m);return}
  if(tab==='storico'){renderStorico(m);return}

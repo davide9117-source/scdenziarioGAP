@@ -367,7 +367,7 @@ function write_(ops) {
     const path = String(op.path || '');
     const m = path.match(/^items\/([A-Za-z0-9_\-.]{1,80})$/);
     if (!m) {
-      if (!/^[A-Za-z0-9_\-\/.]{1,120}$/.test(path)) { res.push('bad'); return; }
+      if (!/^[^\x00-\x1f]{1,160}$/.test(path)) { res.push('bad'); return; }
       if (op.op === 'delete') delete db.meta[path];
       else if (op.op === 'update') db.meta[path] = Object.assign({}, db.meta[path] || {}, op.data || {});
       else db.meta[path] = op.data || {};
@@ -399,5 +399,13 @@ function write_(ops) {
   });
   save_(db);
   bump_();
-  return { ok: true, results: res, ver: version_(), ...db.dump() };
+  return { ok: true, results: res, ver: version_() };
+}
+
+// Modifiche fatte a mano nel foglio: segnalo che i dati sono cambiati, così le app aperte li ricaricano al prossimo giro.
+function onEdit(e) {
+  try {
+    const n = e && e.range && e.range.getSheet().getName();
+    if (n !== USERS && n !== CONF) bump_();
+  } catch (x) { }
 }

@@ -19,6 +19,15 @@
   let queue = ls.json('queue', []);              // modifiche non ancora salvate sul foglio
   const listeners = new Set();
   let flushing = false, retryT = null, retryMs = 5000, lastFull = 0, pollT = null, notifyT = null, loggedIn = null;
+  let persistT = null, sameFails = 0, syncWaiters = [];
+  function persistQueue() {
+    clearTimeout(persistT);
+    persistT = setTimeout(() => { persistT = null; ls.set('queue', JSON.stringify(queue)); }, 0);
+  }
+  function settleWaiters(err) {
+    const w = syncWaiters; syncWaiters = [];
+    w.forEach(x => err ? x.reject(err) : x.resolve());
+  }
 
   /* ── Rete ── */
   async function call(action, payload) {
@@ -67,30 +76,60 @@
   /* ── Sincronizzazione ── */
   function enqueue(op, path, data) {
     queue.push({ op, path, data: data === undefined ? undefined : JSON.parse(JSON.stringify(data)) });
-    ls.set('queue', JSON.stringify(queue));
+    persistQueue();
     notify();
     clearTimeout(retryT);
     retryT = setTimeout(flush, 400);
     return Promise.resolve();
   }
+  function enqueueMany(ops) {
+    ops.forEach(o => queue.push({ op: o.op, path: o.path, data: o.data === undefined ? undefined : JSON.parse(JSON.stringify(o.data)) }));
+    persistQueue();
+    notify();
+    clearTimeout(retryT);
+    retryT = setTimeout(flush, 50);
+  }
+  // Aspetta che la coda sia stata inviata al foglio. Rifiuta se il server continua a rifiutare.
+  function waitSync(onProgress) {
+    if (!queue.length) return Promise.resolve();
+    return new Promise((resolve, reject) => { syncWaiters.push({ resolve, reject, onProgress, total: queue.length }); flush(); });
+  }
+  function dropOps(n, why) {
+    queue = queue.slice(n);
+    persistQueue();
+    sameFails = 0;
+    toast(why);
+  }
   async function flush() {
     if (flushing || !queue.length || !token) return;
     flushing = true;
-    const batch = queue.slice(0, 300);
+    // Dopo ripetuti errori del server sullo stesso gruppo, invio una modifica alla volta per isolare quella che non passa.
+    const batch = queue.slice(0, sameFails >= 3 ? 1 : 300);
     try {
       const j = await call('write', { ops: batch });
       queue = queue.slice(batch.length);
-      ls.set('queue', JSON.stringify(queue));
-      setServer(j);
-      lastFull = Date.now();
+      persistQueue();
+      sameFails = 0;
       retryMs = 5000;
+      // Il server applica le modifiche nello stesso ordine: aggiorno la copia locale senza riscaricare tutto.
+      const base = server || { items: [], meta: {} };
+      server = Object.assign(applyOps(base, batch), { ver: j.ver });
+      ls.set('cache', JSON.stringify(server));
       if ((j.results || []).includes('bad')) toast('Alcune modifiche non sono state accettate dal foglio.');
+      syncWaiters.forEach(w => w.onProgress && w.onProgress(Math.max(0, w.total - queue.length), w.total));
       notify();
-      if (queue.length) setTimeout(flush, 50);
+      status(true);
+      if (queue.length) setTimeout(flush, 50); else settleWaiters(null);
     } catch (e) {
       if (e.code === 'AUTH' || e.code === 'MUST_CHANGE') { needLogin(e.code); }
-      else if (e.code === 'BAD_OPS') { queue = queue.slice(batch.length); ls.set('queue', JSON.stringify(queue)); toast('Modifica scartata: ' + e.message); }
-      else { clearTimeout(retryT); retryT = setTimeout(flush, retryMs); retryMs = Math.min(retryMs * 2, 120000); }
+      else if (e.code === 'BAD_OPS') { dropOps(batch.length, 'Modifica scartata: ' + e.message); setTimeout(flush, 50); }
+      else if (e.code === 'OFFLINE') { clearTimeout(retryT); retryT = setTimeout(flush, retryMs); retryMs = Math.min(retryMs * 2, 120000); status(false); }
+      else {
+        // Errore del server (non di rete): non deve bloccare per sempre tutte le modifiche successive.
+        sameFails++;
+        if (sameFails >= 6 && batch.length === 1) { dropOps(1, 'Una modifica non è stata accettata dal foglio ed è stata scartata: ' + e.message); settleWaiters(e); setTimeout(flush, 50); }
+        else { clearTimeout(retryT); retryT = setTimeout(flush, Math.min(3000 * sameFails, 30000)); }
+      }
       status();
     } finally { flushing = false; }
   }
@@ -104,7 +143,7 @@
       status(true);
     } catch (e) {
       if (e.code === 'AUTH' || e.code === 'MUST_CHANGE') needLogin(e.code);
-      status();
+      status(e.code === 'OFFLINE' ? false : undefined);
     }
   }
   function startPolling() {
@@ -122,7 +161,7 @@
     let b = document.getElementById('sync');
     if (!b) { b = document.createElement('div'); b.id = 'sync'; document.body.append(b); }
     const n = queue.length;
-    const off = !navigator.onLine || (n && retryMs > 5000);
+    const off = !navigator.onLine || !online || (n && retryMs > 5000);
     b.textContent = off ? '⚠️ Offline' + (n ? ' · ' + n + ' modifiche da inviare' : '') : n ? '⏳ Salvataggio…' : '';
     b.style.display = b.textContent ? 'block' : 'none';
   }
@@ -199,8 +238,9 @@
   function gotToken(j) {
     token = j.token; ls.set('tk', token);
     if (j.name && j.name !== me) {
-      if (me) { server = null; queue = []; ls.set('cache', null); ls.set('queue', null); }
+      const had = !!me;
       me = j.name; ls.set('tn', me);
+      if (had) { ['cache', 'queue', 'pf', 'seen'].forEach(k => ls.set(k, null)); location.reload(); }
     }
   }
   function logout() {
@@ -305,6 +345,8 @@
     logout,
     async changePassword() { const r = await changeScreen(false); closeScreen(); if (r) toast('Password cambiata'); },
     pending: () => queue.length,
-    refresh: () => pull(true)
+    refresh: () => pull(true),
+    bulk: enqueueMany,
+    waitSync
   };
 })();
