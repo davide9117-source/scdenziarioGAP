@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Libreria – Team</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#7a3b2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Libreria">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
 :root{--bg:#faf6ef;--card:#fff;--tx:#2b2620;--mu:#7a6f62;--ac:#8a3b2a;--ln:#e6dccb;--ok:#3f7d4e;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -104,6 +112,8 @@ nav>button.on .ic{background:color-mix(in srgb,var(--ac) 14%,transparent);border
 <div class="me" id="me"></div>
 <nav id="nav"></nav>
 <main id="main"></main>
+<script src="config.js"></script>
+<script src="backend.js"></script>
 <script>
 const GIORNI=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
 const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -414,13 +424,14 @@ function whoBox(){
  return F}
 function renderSettings(m){
  const grp=(t,...k)=>{const c=el('div',{class:'set'},el('h2',{},t),...k);m.append(c);return c};
+ grp('Account',el('div',{class:'m'},'Sei entrata come '+(uid||name)+'.'),el('div',{class:'row',style:'flex-wrap:wrap;margin-top:6px'},el('button',{class:'p',type:'button',onclick:()=>teamAuth.changePassword()},'🔑 Cambia password'),el('button',{class:'x',type:'button',onclick:()=>{teamAuth.refresh();toast('Aggiorno dal foglio…')}},'🔄 Aggiorna ora'),el('button',{class:'x',type:'button',onclick:()=>{if(teamAuth.pending()&&!confirm('Ci sono modifiche non ancora salvate sul foglio: uscendo andranno perse. Uscire lo stesso?'))return;teamAuth.logout()}},'Esci')));
  const bg=(opts,cur,fn)=>el('div',{class:'row',style:'flex-wrap:wrap'},...opts.map(([v,l])=>el('button',{class:'chip'+(String(v)===String(cur)?' on':''),type:'button',onclick:()=>fn(v)},l)));
  grp('Aspetto (solo su questo telefono)',el('div',{class:'m'},'Dimensione del testo'),bg([[.9,'Piccolo'],[1,'Normale'],[1.15,'Grande'],[1.3,'Molto grande']],pf.fs,v=>setPf('fs',v)),el('div',{class:'m',style:'margin-top:8px'},'Tema'),bg([['auto','Automatico'],['light','☀️ Giorno'],['dark','🌙 Notte']],pf.theme,v=>setPf('theme',v)),el('div',{class:'m',style:'margin-top:8px'},'Schermata iniziale'),bg([['oggi','Oggi'],['compiti','Compiti'],['turni','Turni']],pf.start,v=>setPf('start',v)));
  grp('Notifiche',el('div',{class:'m'},'Le novità delle colleghe compaiono in Oggi e come avviso mentre l\'app è aperta. Le notifiche a telefono chiuso non sono disponibili.'),bg([[true,'Attive'],[false,'Disattivate']],pf.notif,v=>setPf('notif',v)));
  const tm=grp('Team');
  staff().forEach(x=>{const r=el('div',{class:'row',style:'margin:4px 0;align-items:center'},el('div',{style:'flex:2'},x.name+(x.uid?' 🔗':'')+(x.role==='Area manager'?' · 👔 Area manager':'')),el('button',{class:'x',type:'button',onclick:()=>{const n=prompt('Nuovo nome',x.name);if(n&&n.trim())upd(x.id,{name:n.trim()})}},'Rinomina'));let a=false;r.append(el('button',{class:'x',type:'button',onclick:e=>{if(!a){a=true;e.target.textContent='Sicura?';setTimeout(()=>{a=false;e.target.textContent='Rimuovi'},3000)}else del(x.id)}},'Rimuovi'));const rsel=el('select',{style:'width:auto;font-size:13px;padding:4px'});['Libraia','Area manager'].forEach(v=>rsel.append(el('option',{value:v},v)));rsel.value=x.role==='Area manager'?'Area manager':'Libraia';rsel.onchange=()=>upd(x.id,{role:rsel.value});r.append(rsel);tm.append(r)});
  const ni=el('input',{placeholder:'Nome nuova persona'}),nr=el('select',{style:'width:auto'},el('option',{value:'Libraia'},'Libraia'),el('option',{value:'Area manager'},'Area manager'));tm.append(el('div',{class:'row',style:'margin-top:6px'},ni,nr,el('button',{class:'p',type:'button',onclick:()=>{const n=ni.value.trim();if(n){save('s'+Date.now(),{kind:'staff',name:n,role:nr.value,active:true,ts:Date.now()});ni.value=''}}},'Aggiungi')));
- tm.append(el('div',{class:'m'},'Ogni collega apre il link col proprio account Claude e sceglie il proprio nome al primo accesso (🔗 = collegata).'));
+ tm.append(el('div',{class:'m'},'Ogni collega entra dall\'app con il proprio nome e, la prima volta, con il codice squadra (🔗 = ha già fatto l\'accesso).'));
  const bk=grp('Backup e pulizia');
  const bd=el('button',{class:'p',type:'button',onclick:async()=>{try{const dl=await claude.use('downloads');await dl.save({filename:'backup-libreria-'+today()+'.json',data:JSON.stringify({v:1,items})})}catch(e){toast('Download non disponibile: usa "Copia backup"')}}},'⬇️ Scarica backup');
  const ta=el('textarea',{rows:3,placeholder:'Qui compare il backup da copiare, oppure incolla un backup da ripristinare'});
@@ -499,7 +510,7 @@ function render(){
  if(moreOpen){const sh=el('div',{class:'sheet'});OTH.forEach(t=>sh.append(el('button',{onclick:()=>go(t)},LAB[t])));nav.append(sh)}
  let dl=document.getElementById('staffl');if(!dl){dl=el('datalist',{id:'staffl'});document.body.append(dl)}dl.replaceChildren(...staff().filter(x=>x.role!=='Area manager').map(x=>el('option',{value:x.name})));
  const m=document.getElementById('main');m.replaceChildren();
- if(!db){m.append(el('p',{class:'empty'},'Il salvataggio condiviso non è disponibile in questa vista: apri l\'app da claude.ai per usarla con il team.'));return}
+ if(!db){m.append(el('p',{class:'empty'},'Collegamento al foglio Google non disponibile.'));return}
  if(needWho){m.append(whoBox());return}
  if(tab==='impostazioni'){renderSettings(m);return}
  if(tab==='oggi'){renderOggi(m);return}
@@ -552,24 +563,28 @@ function render(){
  }
 }
 
+function linkMe(){if(!uid)return;const L=staff(),sd=L.find(x=>x.uid===uid)||L.find(x=>x.name.toLowerCase()===uid.toLowerCase());
+ if(sd){name=sd.name;if(sd.uid!==uid)upd(sd.id,{uid})}else save('s'+Date.now(),{kind:'staff',name:uid,uid,active:true,role:'Libraia',ts:Date.now()});needWho=false;renderMe()}
 function renderMe(){
  const me=document.getElementById('me');me.replaceChildren();
- me.append(name?('Ciao '+name+((staff().find(x=>x.name===name)||{}).role==='Area manager'?' · 👔 Area manager':'')+' · '):'Scrivi il tuo nome per firmare le note · ',el('a',{onclick:()=>{needWho=true;render()}},name?'cambia':'imposta'));
+ if(name)me.append('Ciao '+name+((staff().find(x=>x.name===name)||{}).role==='Area manager'?' · 👔 Area manager':'')+' · ',el('a',{onclick:()=>{tab='impostazioni';render();window.scrollTo(0,0)}},'account'));
 }
 applyPf();tab=pf.start||'oggi';renderMe();render();
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 (async()=>{
  try{db=await claude.use('db')}catch(e){db=null}
  try{sample=await claude.use('sample')}catch(e){sample=null}
  try{const c=sample&&await sample.limits();imgOK=!!(c&&c.images)}catch(e){}
  if(!db){render();return}
  try{usr=await claude.use('user');const me=usr&&await usr.me();uid=(me&&me.id)||''}catch(e){}
+ if(uid){name=uid;needWho=false;renderMe()}
  try{const sn=await db.doc('meta/settings').get();cfg=sn.exists?sn.data():{}}catch(e){}
  try{const r=uref(),sn=r&&await r.get();if(sn&&sn.exists){const d=sn.data();if(d.pf)Object.assign(pf,d.pf);seenTs=+d.seen||0;applyPf();tab=pf.start||'oggi'}}catch(e){}
  try{if(!seenTs)seenTs=+localStorage.getItem('seen')||0}catch(e){}
  if(!seenTs){seenTs=Date.now();savePriv()}
  db.collection('items').limit(1000).onSnapshot(s=>{items=s.docs.map(d=>{const x={...d.data(),id:d.id};if(x.kind==='fixed'){x.kind='task';x.freq='weekly';x.log=[]}if(x.freq==='weekly'&&!x.days)x.days=x.day!=null?[x.day]:[];else if(x.kind==='due'){x.kind='task';x.freq='due';x.log=x.done?[{by:'',at:x.ts||0,p:'once',n:''}]:[]}return x});
   const a=document.activeElement;const ids=new Set(items.map(i=>i.id));if(known)items.filter(i=>!known.has(i.id)&&i.by&&i.by!==name&&KL[i.kind]).forEach(i=>{const tx=i.by+': '+KL[i.kind]+' — '+(i.text||i.title||i.name||i.who||'');if(pf.notif){toast('🔔 '+tx);}});known=ids;renderMe();
-  if(!started){started=true;syncCond();if(cfg.purgeDays&&localStorage.getItem('pday')!==today()){try{localStorage.setItem('pday',today())}catch(e){}purge(cfg.purgeDays)}}
+  if(!started){started=true;linkMe();syncCond();if(cfg.purgeDays&&localStorage.getItem('pday')!==today()){try{localStorage.setItem('pday',today())}catch(e){}purge(cfg.purgeDays)}}
   if(!seeded){seeded=true;autoSeed()}if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')){pending=true;return}render()},()=>{});
  render();
 })();
