@@ -24,7 +24,7 @@ h1{font-size:22px;margin:6px 0}
 h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);margin:22px 0 8px}
 nav{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:2}
 nav button{flex:none;border:1px solid var(--ln);background:var(--card);color:var(--tx);padding:8px 12px;border-radius:20px;font:inherit;font-size:14px}
-nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+nav button.on{background:var(--ac);color:var(--onac);border-color:var(--ac)}
 .card{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:10px 12px;margin:8px 0;display:flex;gap:10px;align-items:flex-start}
 .card .b{flex:1;min-width:0;overflow-wrap:anywhere}
 .card .m{font-size:13px;color:var(--mu)}
@@ -76,9 +76,9 @@ h2.late{color:#d64533}.card.lt{border-left-color:#d64533;background:color-mix(in
 nav>button{position:relative}.bdg{position:absolute;top:0;right:22%;background:#d64533;color:#fff;border-radius:10px;font:700 11px system-ui,sans-serif;padding:1px 6px}
 .nv{padding:8px 12px;font-size:14px;border-bottom:1px solid var(--ln)}.nv.new{font-weight:600}.nv small{color:var(--mu);font-weight:400}
 
-:root{--bg:#f6f3ee;--card:#fff;--tx:#26231f;--mu:#7b7369;--ac:#7a3b2e;--ln:#ebe5da}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171411;--card:#221e19;--tx:#eee6d8;--mu:#a1968a;--ln:#332d25;--ac:#e08a72}}
-:root[data-theme="dark"]{--bg:#171411;--card:#221e19;--tx:#eee6d8;--mu:#a1968a;--ln:#332d25;--ac:#e08a72}
+:root{--bg:#f6f3ee;--card:#fff;--tx:#26231f;--mu:#6b6359;--ac:#7a3b2e;--ln:#e3dccf;--onac:#fff;--dn:#b8321f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171411;--card:#221e19;--tx:#f1eadc;--mu:#b5aa9c;--ln:#3d362d;--ac:#e8957e;--onac:#1c1410;--dn:#ff8a78}}
+:root[data-theme="dark"]{--bg:#171411;--card:#221e19;--tx:#f1eadc;--mu:#b5aa9c;--ln:#3d362d;--ac:#e8957e;--onac:#1c1410;--dn:#ff8a78}
 body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:16px;line-height:1.45;padding-left:16px;padding-right:16px}
 h1{font-family:Georgia,'Times New Roman',serif;font-size:22px;letter-spacing:.01em}
 #me{margin:2px 0 10px}
@@ -94,17 +94,37 @@ details>summary{font-size:15px;padding:13px 15px}
 details>.card{border:0;border-left:0;border-radius:0;border-bottom:1px solid var(--ln);margin:0;padding:12px 15px;box-shadow:none;background:transparent}
 details>.card:last-child{border-bottom:0}
 details>.card.lt{border-left:4px solid #d64533}
-button.p{border-radius:12px;padding:12px 14px;font-weight:600}
+button.p{border-radius:12px;padding:12px 14px;font-weight:600;color:var(--onac)}
 button.x{color:var(--ac);font-size:13.5px;padding:6px 8px}
 input,select,textarea{border-radius:12px;padding:10px 12px;background:var(--card)}
 input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(--ac) 45%,transparent);border-color:var(--ac)}
 form{border-radius:16px;border:1px solid var(--ln);border-style:solid;padding:14px;gap:10px}
-.chip{border-radius:16px;padding:6px 12px}.chip.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.chip{border-radius:16px;padding:6px 12px}.chip.on{background:var(--ac);color:var(--onac);border-color:var(--ac)}
 .chip.day{border-radius:14px;padding:6px 2px}.chip.day.today{outline:none;box-shadow:inset 0 -3px 0 var(--ac)}
 nav{box-shadow:0 -2px 12px rgba(70,45,20,.08)}
 nav>button.on .ic{background:color-mix(in srgb,var(--ac) 14%,transparent);border-radius:14px;padding:0 16px}
 .cell{border-radius:10px}
 .lateb{border-radius:10px}
+
+button.s{background:var(--card);border:1.5px solid var(--ac);color:var(--ac);border-radius:12px;padding:11px 14px;font:inherit;font-weight:600}
+button.s.d,button.p.d{border-color:var(--dn);color:var(--dn)}button.p.d{background:var(--dn);color:#fff}
+button:disabled{opacity:.5}
+.set{padding:6px 16px 16px}.set h2{margin:12px 0 4px;font-size:15px;letter-spacing:0;text-transform:none;color:var(--tx);display:flex;align-items:center;gap:8px}
+.set h2 .ic{font-size:20px}.set .sub{color:var(--mu);font-size:14px;margin:0 0 10px}
+.opt{border-top:1px solid var(--ln);padding:12px 0}.opt:last-child{padding-bottom:2px}
+.opt .l{font-weight:600;font-size:15px}.opt .h{color:var(--mu);font-size:13.5px;margin:2px 0 8px}
+.opt .row{flex-wrap:wrap}.opt .row>button{flex:1 1 auto}
+.member{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 0;border-top:1px solid var(--ln)}.member .n{flex:1 1 100%;min-width:0;font-weight:600}.member select{flex:1}.member .n small{display:block;color:var(--mu);font-weight:400}
+.member button.s,.member select{padding:6px 10px;font-size:14px;font-weight:500;flex:none;width:auto}
+.drop{border:2px dashed var(--ac);border-radius:14px;padding:22px 14px;text-align:center;color:var(--tx);background:color-mix(in srgb,var(--ac) 6%,var(--card));cursor:pointer}
+.drop.over{background:color-mix(in srgb,var(--ac) 18%,var(--card))}.drop b{display:block;font-size:15px}.drop span{color:var(--mu);font-size:13.5px}
+dialog.dlg{border:0;border-radius:18px;padding:0;background:var(--card);color:var(--tx);max-width:min(440px,calc(100vw - 32px));width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+dialog.dlg::backdrop{background:rgba(0,0,0,.45)}
+dialog.dlg .bd{padding:20px 20px 16px}dialog.dlg h3{margin:0 0 8px;font-size:18px}dialog.dlg p{margin:0 0 8px;font-size:15px;line-height:1.45}
+dialog.dlg ul{margin:6px 0 10px;padding-left:20px;font-size:14.5px}dialog.dlg .m{color:var(--mu);font-size:13.5px}
+dialog.dlg .bt{display:flex;gap:8px;padding:0 20px 20px;flex-wrap:wrap}dialog.dlg .bt>button{flex:1 1 40%}
+dialog.dlg input{margin:6px 0 4px}dialog.dlg .prog{height:8px;border-radius:4px;background:var(--ln);overflow:hidden;margin:10px 0}dialog.dlg .prog i{display:block;height:100%;background:var(--ac);width:0;transition:width .2s}
+#sync{color:var(--bg)}
 </style>
 </head>
 <body>
@@ -145,6 +165,15 @@ function applyPf(){document.body.style.zoom=pf.fs;if(pf.theme==='auto')document.
 const uref=()=>db&&uid?db.doc('data/users/'+uid+'/prefs'):null;
 function savePriv(){const r=uref();if(r)r.set({pf,seen:seenTs}).catch(()=>{})}
 function setPf(k,v){pf[k]=v;try{localStorage.setItem('pf',JSON.stringify(pf))}catch(e){}savePriv();applyPf();render()}
+function dialog(o){
+ return new Promise(res=>{const d=el('dialog',{class:'dlg'}),bd=el('div',{class:'bd'},el('h3',{},o.title));
+  (Array.isArray(o.body)?o.body:[o.body]).forEach(x=>x!=null&&bd.append(typeof x==='string'?el('p',{},x):x));
+  const bt=el('div',{class:'bt'});
+  (o.buttons||[{label:'OK',value:true,cls:'p'}]).forEach(b=>bt.append(el('button',{class:b.cls||'s',type:'button',onclick:()=>{if(b.keep)return b.onclick&&b.onclick(d);d.close();res(b.value)}},b.label)));
+  d.append(bd,bt);d.oncancel=e=>{if(o.locked)e.preventDefault();else{d.close();res(o.cancelValue)}};d.onclose=()=>{d.remove()};
+  document.body.append(d);d.showModal();if(o.onopen)o.onopen(d)})}
+const confirmBox=(title,body,ok,danger)=>dialog({title,body,buttons:[{label:'Annulla',value:false},{label:ok||'Conferma',value:true,cls:'p'+(danger?' d':'')}],cancelValue:false});
+function promptBox(title,body,value,ok){const i=el('input',{value:value||''});return dialog({title,body:[body,i],buttons:[{label:'Annulla',value:null},{label:ok||'Salva',value:'__',cls:'p'}],cancelValue:null,onopen:()=>{i.focus();i.select()}}).then(v=>v==='__'?i.value.trim():null)}
 function toast(t){let b=document.getElementById('toast');if(!b){b=el('div',{id:'toast'});document.body.append(b)}b.textContent=t;b.style.display='block';clearTimeout(b._t);b._t=setTimeout(()=>b.style.display='none',6000)}
 const KL={task:'nuovo compito',shift:'nuovo turno',event:'nuovo evento',note:'nuova nota',client:'nuovo ordine cliente',book:'nuova lettura'};
 const staff=()=>items.filter(i=>i.kind==='staff'&&i.active!==false).sort((a,b)=>a.name.localeCompare(b.name));
@@ -162,7 +191,7 @@ function occ(it){const t=REF||today(),T0=new Date(t+'T00:00:00');
 const pk=it=>it.freq==='daily'?(REF||today()):it.freq==='weekly'?occ(it):it.freq==='monthly'?(REF||today()).slice(0,7):'once';
 const whoOn=(d,f,t)=>[...new Set(items.filter(i=>i.kind==='shift'&&i.date===d&&i.from<t&&i.to>f).map(i=>i.who))];
 const when=t=>new Date(t).toLocaleString('it-IT',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'});
-function save(id,data){db&&db.doc('items/'+id).set(data).catch(e=>alert('Salvataggio non riuscito: '+(e&&e.code||e)))}
+function save(id,data){db&&db.doc('items/'+id).set(data).catch(e=>dialog({title:'Salvataggio non riuscito',body:String(e&&e.message||e)}))}
 function upd(id,d){db&&db.doc('items/'+id).update(d).catch(()=>{})}
 function del(id){db&&db.doc('items/'+id).delete().catch(()=>{})}
 
@@ -255,7 +284,7 @@ function row(s,it){
  let armed=false;
  if(s.kind==='note')acts.append(el('button',{class:'x',onclick:()=>upd(it.id,{pin:!it.pin})},it.pin?'📌 Stacca':'📌 Fissa'));
  acts.append(el('button',{class:'x',onclick:()=>{editing=it.id;render()}},'Modifica'),
-  el('button',{class:'x',onclick:e=>{if(!armed){armed=true;e.target.textContent='Sicura?';setTimeout(()=>{armed=false;e.target.textContent='Elimina'},3000)}else del(it.id)}},'Elimina'));
+  el('button',{class:'x',onclick:async()=>{if(await confirmBox('Eliminare?',[el('p',{},el('b',{},title)),s.kind==='task'&&(it.log||[]).length?'Si perde anche lo storico delle volte in cui è stato fatto.':'Non si può annullare.'],'Elimina',true))del(it.id)}},'Elimina'));
  c.append(acts);return c;
 }
 
@@ -268,7 +297,7 @@ async function autoSeed(){try{const ref=db.doc('meta/holidays'),sn=await ref.get
  await ref.set({years:[...done,...todo]})}catch(e){}}
 async function addHol(e){const btn=e.target;btn.disabled=true;btn.textContent='Aggiungo…';const y0=new Date().getFullYear();
  try{for(const y of [y0,y0+1])for(const [d,t] of hol(y))if(!items.some(i=>i.kind==='event'&&i.start===d&&i.title===t))await db.doc('items/h'+d+t.replace(/\W/g,'').slice(0,10)).set({kind:'event',type:'Festività',title:t,start:d,end:'',ts:Date.now()})}
- catch(x){alert('Non sono riuscita ad aggiungerle tutte, riprova.')}
+ catch(x){dialog({title:'Errore',body:'Non sono riuscita ad aggiungerle tutte, riprova.'})}
  render()}
 const MONTHS=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
 function mailDates(t){const out=new Set(),n=new Date(),p=x=>String(x).padStart(2,'0');
@@ -308,7 +337,7 @@ function reviewBox(){
   try{for(const [i,t] of review.T.entries())if(t.on&&t.text){if(v&&v.on&&v.ptype==='Sell in'&&/rdr|riassort|ordine/i.test(t.text)){t.freq='window';t.start=v.cstart;t.due=v.cend}
     await db.doc('items/m'+now+'-'+i).set({kind:'task',text:t.text,note:t.note,who:'',grp:t.grp||(v?v.title:''),freq:t.freq,start:t.freq==='day'?'':t.start,due:t.due,tfrom:'',tto:'',log:[],ts:now+i,by:name})}
    if(v&&v.on)await db.doc('items/m'+now+'-e').set({kind:'event',type:v.type||'Altro',ptype:v.ptype||'',title:v.title,start:v.start,end:v.end||'',cstart:v.cstart||'',cend:v.cend||'',ts:now})}
-  catch(x){alert('Non sono riuscita a salvare tutto, controlla la lista.')}
+  catch(x){dialog({title:'Errore',body:'Non sono riuscita a salvare tutto, controlla la lista.'})}
   review=null;render()}},'Crea selezionati'),el('button',{class:'x',type:'button',onclick:()=>{review=null;render()}},'Annulla')));
  return F;
 }
@@ -423,24 +452,73 @@ function whoBox(){
  F.append(inp,el('button',{class:'x',type:'button',onclick:()=>{const n=inp.value.trim();if(n)pick(n,L.find(x=>x.name===n)||null)}},'Aggiungimi ed entra'));
  return F}
 function renderSettings(m){
- const grp=(t,...k)=>{const c=el('div',{class:'set'},el('h2',{},t),...k);m.append(c);return c};
- grp('Account',el('div',{class:'m'},'Sei entrata come '+(uid||name)+'.'),el('div',{class:'row',style:'flex-wrap:wrap;margin-top:6px'},el('button',{class:'p',type:'button',onclick:()=>teamAuth.changePassword()},'🔑 Cambia password'),el('button',{class:'x',type:'button',onclick:()=>{teamAuth.refresh();toast('Aggiorno dal foglio…')}},'🔄 Aggiorna ora'),el('button',{class:'x',type:'button',onclick:()=>{if(teamAuth.pending()&&!confirm('Ci sono modifiche non ancora salvate sul foglio: uscendo andranno perse. Uscire lo stesso?'))return;teamAuth.logout()}},'Esci')));
+ const grp=(ic,t,sub,...k)=>{const c=el('div',{class:'set'},el('h2',{},el('span',{class:'ic'},ic),t),sub?el('p',{class:'sub'},sub):null,...k);m.append(c);return c};
+ const opt=(l,h,...k)=>el('div',{class:'opt'},el('div',{class:'l'},l),h?el('div',{class:'h'},h):null,...k);
  const bg=(opts,cur,fn)=>el('div',{class:'row',style:'flex-wrap:wrap'},...opts.map(([v,l])=>el('button',{class:'chip'+(String(v)===String(cur)?' on':''),type:'button',onclick:()=>fn(v)},l)));
- grp('Aspetto (solo su questo telefono)',el('div',{class:'m'},'Dimensione del testo'),bg([[.9,'Piccolo'],[1,'Normale'],[1.15,'Grande'],[1.3,'Molto grande']],pf.fs,v=>setPf('fs',v)),el('div',{class:'m',style:'margin-top:8px'},'Tema'),bg([['auto','Automatico'],['light','☀️ Giorno'],['dark','🌙 Notte']],pf.theme,v=>setPf('theme',v)),el('div',{class:'m',style:'margin-top:8px'},'Schermata iniziale'),bg([['oggi','Oggi'],['compiti','Compiti'],['turni','Turni']],pf.start,v=>setPf('start',v)));
- grp('Notifiche',el('div',{class:'m'},'Le novità delle colleghe compaiono in Oggi e come avviso mentre l\'app è aperta. Le notifiche a telefono chiuso non sono disponibili.'),bg([[true,'Attive'],[false,'Disattivate']],pf.notif,v=>setPf('notif',v)));
- const tm=grp('Team');
- staff().forEach(x=>{const r=el('div',{class:'row',style:'margin:4px 0;align-items:center'},el('div',{style:'flex:2'},x.name+(x.uid?' 🔗':'')+(x.role==='Area manager'?' · 👔 Area manager':'')),el('button',{class:'x',type:'button',onclick:()=>{const n=prompt('Nuovo nome',x.name);if(n&&n.trim())upd(x.id,{name:n.trim()})}},'Rinomina'));let a=false;r.append(el('button',{class:'x',type:'button',onclick:e=>{if(!a){a=true;e.target.textContent='Sicura?';setTimeout(()=>{a=false;e.target.textContent='Rimuovi'},3000)}else del(x.id)}},'Rimuovi'));const rsel=el('select',{style:'width:auto;font-size:13px;padding:4px'});['Libraia','Area manager'].forEach(v=>rsel.append(el('option',{value:v},v)));rsel.value=x.role==='Area manager'?'Area manager':'Libraia';rsel.onchange=()=>upd(x.id,{role:rsel.value});r.append(rsel);tm.append(r)});
- const ni=el('input',{placeholder:'Nome nuova persona'}),nr=el('select',{style:'width:auto'},el('option',{value:'Libraia'},'Libraia'),el('option',{value:'Area manager'},'Area manager'));tm.append(el('div',{class:'row',style:'margin-top:6px'},ni,nr,el('button',{class:'p',type:'button',onclick:()=>{const n=ni.value.trim();if(n){save('s'+Date.now(),{kind:'staff',name:n,role:nr.value,active:true,ts:Date.now()});ni.value=''}}},'Aggiungi')));
- tm.append(el('div',{class:'m'},'Ogni collega entra dall\'app con il proprio nome e, la prima volta, con il codice squadra (🔗 = ha già fatto l\'accesso).'));
- const bk=grp('Backup e pulizia');
- const bd=el('button',{class:'p',type:'button',onclick:async()=>{try{const dl=await claude.use('downloads');await dl.save({filename:'backup-libreria-'+today()+'.json',data:JSON.stringify({v:1,items})})}catch(e){toast('Download non disponibile: usa "Copia backup"')}}},'⬇️ Scarica backup');
- const ta=el('textarea',{rows:3,placeholder:'Qui compare il backup da copiare, oppure incolla un backup da ripristinare'});
- const cp=el('button',{class:'x',type:'button',onclick:()=>{ta.value=JSON.stringify({v:1,items});ta.select();try{navigator.clipboard.writeText(ta.value)}catch(e){}}},'Copia backup');
- let ra=false;const rs=el('button',{class:'x',type:'button',onclick:async e=>{if(!ra){ra=true;e.target.textContent='Sovrascrive i dati con lo stesso id: confermi?';return}try{const d=JSON.parse(ta.value);const jobs=(d.items||[]).map(({id,...r})=>[id,r]);const r=await pool(jobs,e.target);toast('Ripristinate '+r.ok+' voci'+(r.fail?' ('+r.fail+' errori)':''))}catch(x){toast('Backup non valido')}ra=false;e.target.textContent='Ripristina da backup incollato'}},'Ripristina da backup incollato');
- bk.append(el('div',{class:'row'},bd,cp),ta,rs,el('div',{class:'m',style:'margin-top:10px'},'Elimina automaticamente compiti singoli fatti, turni passati e vecchie spunte dei compiti ricorrenti dopo:'));
+ const isAM=(staff().find(x=>x.name===name)||{}).role==='Area manager';
+ // Account
+ grp('👤','Il tuo account',null,
+  opt('Sei entrata come '+(uid||name),isAM?'Ruolo: Area manager':'Ruolo: Libraia'),
+  opt('Password',null,el('div',{class:'row'},el('button',{class:'s',type:'button',onclick:()=>teamAuth.changePassword()},'🔑 Cambia password'))),
+  opt('Esci dall\'app','Per rientrare servono nome e password.',el('div',{class:'row'},el('button',{class:'s d',type:'button',onclick:async()=>{const n=teamAuth.pending();
+   if(await confirmBox('Uscire dall\'app?',n?['Ci sono '+n+' modifiche non ancora salvate sul foglio: se esci adesso vanno perse.','Vuoi uscire lo stesso?']:'Per rientrare ti serviranno nome e password.','Esci',!!n))teamAuth.logout()}},'Esci'))));
+ // Aspetto
+ grp('🎨','Aspetto','Queste scelte valgono solo su questo dispositivo.',
+  opt('Dimensione del testo',null,bg([[.9,'Piccolo'],[1,'Normale'],[1.15,'Grande'],[1.3,'Molto grande']],pf.fs,v=>setPf('fs',v))),
+  opt('Tema',null,bg([['auto','Automatico'],['light','☀️ Giorno'],['dark','🌙 Notte']],pf.theme,v=>setPf('theme',v))),
+  opt('Schermata iniziale','La sezione che si apre all\'avvio.',bg([['oggi','Oggi'],['compiti','Compiti'],['turni','Turni']],pf.start,v=>setPf('start',v))));
+ // Notifiche
+ grp('🔔','Avvisi',null,
+  opt('Novità dalle colleghe','Mostra in Oggi le ultime cose aggiunte dagli altri e un avviso quando arrivano mentre l\'app è aperta. Non ci sono notifiche a telefono chiuso.',bg([[true,'Attivi'],[false,'Disattivati']],pf.notif,v=>setPf('notif',v))));
+ // Team
+ const tm=grp('👥','Team','Le persone che usano l\'app. Ognuna entra con il proprio nome e, la prima volta, con il codice squadra.');
+ staff().forEach(x=>{const rsel=el('select',{'aria-label':'Ruolo'});['Libraia','Area manager'].forEach(v=>rsel.append(el('option',{value:v},v)));rsel.value=x.role==='Area manager'?'Area manager':'Libraia';rsel.onchange=()=>upd(x.id,{role:rsel.value});
+  tm.append(el('div',{class:'member'},el('div',{class:'n'},x.name,el('small',{},x.uid?'🔗 ha già fatto l\'accesso':'non è ancora entrata')),rsel,
+   el('button',{class:'s',type:'button',onclick:async()=>{const n=await promptBox('Rinomina '+x.name,'Il nuovo nome comparirà nei compiti e nei turni già assegnati a questa persona.',x.name);if(n&&n!==x.name)upd(x.id,{name:n})}},'✏️'),
+   el('button',{class:'s d',type:'button',onclick:async()=>{if(await confirmBox('Rimuovere '+x.name+' dal team?',['Sparisce dall\'elenco delle persone. I compiti, i turni e le note già inseriti restano.',x.uid?'Potrà comunque rientrare nell\'app con la sua password: per bloccarla del tutto cancella la sua riga nella scheda "Utenti" del foglio Google.':null],'Rimuovi',true))del(x.id)}},'🗑️')))});
+ const ni=el('input',{placeholder:'Nome della nuova persona'}),nr=el('select',{'aria-label':'Ruolo'},el('option',{value:'Libraia'},'Libraia'),el('option',{value:'Area manager'},'Area manager'));
+ tm.append(opt('Aggiungi una persona','Facoltativo: chi entra con il codice squadra viene aggiunto da solo.',el('div',{class:'row'},ni,nr),el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'p',type:'button',onclick:()=>{const n=ni.value.trim();if(!n)return;save('s'+Date.now(),{kind:'staff',name:n,role:nr.value,active:true,ts:Date.now()});ni.value='';toast(n+' aggiunta al team')}},'Aggiungi'))));
+ // Backup
+ const bk=grp('💾','Backup','Una copia di tutti i dati (compiti, turni, promo, note, clienti, letture, team) in un file. Utile prima di grandi modifiche o per spostare i dati.');
+ bk.append(opt('Salva una copia','Scarica un file "backup-libreria-data.json" su questo dispositivo.',el('div',{class:'row'},el('button',{class:'p',type:'button',onclick:async()=>{try{const dl=await claude.use('downloads');await dl.save({filename:'backup-libreria-'+today()+'.json',data:JSON.stringify({v:1,at:Date.now(),items})});toast('Backup scaricato: '+items.length+' voci')}catch(e){toast('Download non disponibile su questo dispositivo')}}},'⬇️ Scarica backup'))));
+ const fi=el('input',{type:'file',accept:'.json,application/json',style:'display:none'});
+ const drop=el('div',{class:'drop',tabindex:'0',role:'button'},el('b',{},'📂 Trascina qui il file di backup'),el('span',{},'oppure tocca per sfogliare'));
+ drop.onclick=()=>fi.click();drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fi.click()}};
+ drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};drop.ondragleave=()=>drop.classList.remove('over');
+ drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');const f=e.dataTransfer.files[0];if(f)restoreFile(f)};
+ fi.onchange=()=>{if(fi.files[0])restoreFile(fi.files[0]);fi.value=''};
+ bk.append(opt('Ripristina da un backup','Riporta nell\'app i dati di un file di backup. Ti mostro cosa contiene prima di procedere.',drop,fi));
+ // Pulizia
  const sel=el('select');[[0,'Mai'],[30,'30 giorni'],[60,'60 giorni'],[90,'90 giorni'],[180,'6 mesi'],[365,'1 anno']].forEach(([v,l])=>sel.append(el('option',{value:v},l)));sel.value=cfg.purgeDays||0;
- sel.onchange=()=>{cfg.purgeDays=+sel.value;db.doc('meta/settings').set(cfg).catch(()=>{})};
- bk.append(sel,el('div',{class:'m'},'Le promo, gli eventi, le note e i dati di andamento non vengono mai eliminati. Con la pulizia lo Storico dei compiti si ferma al periodo scelto.'),el('button',{class:'x',type:'button',onclick:async e=>{const d=+sel.value;if(!d){toast('Scegli prima un periodo');return}e.target.disabled=true;const n=await purge(d);toast('Eliminate '+n+' voci vecchie');e.target.disabled=false}},'Pulisci ora'));
+ sel.onchange=()=>{cfg.purgeDays=+sel.value;db.doc('meta/settings').set(cfg).catch(()=>{});toast(+sel.value?'Pulizia automatica: dopo '+sel.options[sel.selectedIndex].text:'Pulizia automatica disattivata')};
+ grp('🧹','Pulizia','Per non far crescere il foglio all\'infinito. Promo, eventi, note, clienti, letture e dati di andamento non vengono mai toccati.',
+  opt('Elimina automaticamente','Compiti singoli già fatti, turni passati e vecchie spunte dei compiti ricorrenti più vecchi di:',sel,el('div',{class:'h',style:'margin-top:8px'},'Vale per tutto il team. Lo Storico dei compiti si ferma al periodo scelto.')),
+  opt('Pulisci adesso',null,el('div',{class:'row'},el('button',{class:'s d',type:'button',onclick:async e=>{const d=+sel.value;if(!d){await dialog({title:'Scegli prima un periodo',body:'Imposta qui sopra dopo quanto tempo eliminare le voci vecchie, poi premi "Pulisci adesso".'});return}
+   if(!await confirmBox('Pulire adesso?',['Elimino subito compiti singoli fatti, turni passati e spunte più vecchi di '+sel.options[sel.selectedIndex].text+'.','Vale per tutto il team e non si può annullare (a meno di un backup).'],'Pulisci',true))return;
+   e.target.disabled=true;const n=await purge(d);e.target.disabled=false;await dialog({title:'Pulizia completata',body:n?'Eliminate '+n+' voci vecchie.':'Non c\'era niente da eliminare.'})}},'Pulisci adesso'))));
+ // Info
+ grp('ℹ️','Informazioni',null,opt('Dati','I dati sono nel foglio Google del team e vengono aggiornati ogni 30 secondi circa. Le modifiche fatte senza rete vengono inviate appena torna la connessione.',el('div',{class:'row'},el('button',{class:'s',type:'button',onclick:()=>{teamAuth.refresh();toast('Aggiorno dal foglio…')}},'🔄 Aggiorna adesso'))));
+}
+const KIND_IT={task:['compito','compiti'],shift:['turno','turni'],event:['evento','eventi'],note:['nota','note'],client:['cliente','clienti'],book:['lettura','letture'],staff:['persona del team','persone del team']};
+async function restoreFile(f){
+ let d;
+ try{d=JSON.parse(await f.text())}catch(e){await dialog({title:'File non valido',body:'"'+f.name+'" non è un backup di questa app. Il backup è un file .json creato con "Scarica backup".'});return}
+ const L=Array.isArray(d)?d:(d&&Array.isArray(d.items)?d.items:null);
+ if(!L||!L.every(x=>x&&x.id&&x.kind)){await dialog({title:'File non valido',body:'"'+f.name+'" non contiene dati riconoscibili. Serve un file creato con "Scarica backup".'});return}
+ const cnt={};L.forEach(x=>cnt[x.kind]=(cnt[x.kind]||0)+1);
+ const have=new Set(items.map(i=>i.id)),same=L.filter(x=>have.has(x.id)).length,nw=L.length-same;
+ const ul=el('ul',{},...Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([k,n])=>el('li',{},n+' '+(KIND_IT[k]?KIND_IT[k][n===1?0:1]:k))));
+ const when_=d.at?new Date(d.at).toLocaleString('it-IT',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}):null;
+ const ok=await dialog({title:'Ripristinare questo backup?',body:[el('p',{},el('b',{},f.name),when_?el('span',{class:'m'},' · salvato il '+when_):null),'Contiene '+L.length+' voci:',ul,
+  el('p',{},nw+' '+(nw===1?'voce nuova viene aggiunta':'voci nuove vengono aggiunte')+(same?'; '+same+' '+(same===1?'voce già presente viene sovrascritta':'voci già presenti vengono sovrascritte')+' con la versione del backup':'')+'.'),
+  el('p',{class:'m'},'Niente viene cancellato: ciò che è nell\'app e non nel backup resta com\'è.')],
+  buttons:[{label:'Annulla',value:false},{label:'Ripristina '+L.length+' voci',value:true,cls:'p'}],cancelValue:false});
+ if(!ok)return;
+ let bar,pdEl;dialog({title:'Ripristino in corso…',body:[el('p',{},'Invio le voci al foglio Google, non chiudere l\'app.'),bar=el('div',{class:'prog'},el('i'))],buttons:[],locked:true,onopen:d=>pdEl=d});
+ const jobs=L.map(({id,...r})=>[id,r]);let done=0,ok2=0,fail=0;
+ for(const [id,r] of jobs){try{await db.doc('items/'+id).set(r);ok2++}catch(e){fail++}done++;bar.firstChild.style.width=Math.round(done*100/jobs.length)+'%'}
+ if(pdEl){pdEl.close();pdEl.remove()}
+ await dialog({title:fail?'Ripristino con errori':'Ripristino completato',body:fail?ok2+' voci ripristinate, '+fail+' non riuscite. Riprova più tardi.':ok2+' voci ripristinate.'});
 }
 function renderOggi(m){
  const t=today(),D=vd||t;REF=D;const dt=new Date(D+'T00:00:00'),dow=dt.getDay(),S=SEC.compiti,in7=addD(t,7),T=items.filter(i=>i.kind==='task');

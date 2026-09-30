@@ -1,6 +1,6 @@
 // Service worker: permette di aprire l'app anche senza rete.
 // Prima prova la rete (così gli aggiornamenti arrivano subito), se manca usa la copia salvata.
-const CACHE = 'libreria-v1';
+const CACHE = 'libreria-v2';
 const SHELL = ['./', 'index.html', 'backend.js', 'config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
