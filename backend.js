@@ -14,7 +14,8 @@
   };
   const apiUrl = () => (ls.get('apiUrl') || (window.APP_CONFIG && window.APP_CONFIG.apiUrl) || '').trim();
 
-  let token = ls.get('tk'), me = ls.get('tn') || '';
+  let token = ls.get('tk'), me = ls.get('tn') || '', perms = ls.json('tp', []);
+  function gotPerms(j) { if (j && Array.isArray(j.perms)) { perms = j.perms; ls.set('tp', JSON.stringify(perms)); } }
   let server = ls.json('cache', null);           // {items:[], meta:{}, ver}
   let queue = ls.json('queue', []);              // modifiche non ancora salvate sul foglio
   const listeners = new Set();
@@ -68,7 +69,7 @@
     clearTimeout(notifyT);
     notifyT = setTimeout(() => {
       const docs = view().items.map(i => { const { id, ...rest } = i; return { id, data: () => rest }; });
-      listeners.forEach(l => { try { l.cb({ docs: docs.slice(0, l.limit) }); } catch (e) { console.error(e); } });
+      listeners.forEach(l => { try { l.cb({ docs }); } catch (e) { console.error(e); } });
       status();
     }, 0);
   }
@@ -113,8 +114,11 @@
       retryMs = 5000;
       // Il server applica le modifiche nello stesso ordine: aggiorno la copia locale senza riscaricare tutto.
       const base = server || { items: [], meta: {} };
-      server = Object.assign(applyOps(base, batch), { ver: j.ver });
+      const inStep = !!(j.base && base.ver && j.base === base.ver);
+      server = Object.assign(applyOps(base, batch), { ver: inStep ? j.ver : '' });
       ls.set('cache', JSON.stringify(server));
+      // Qualcun altro ha scritto nel frattempo: riscarico tutto per non perdermi le sue modifiche.
+      if (!inStep && !queue.length) setTimeout(() => pull(true), 100);
       if ((j.results || []).includes('bad')) toast('Alcune modifiche non sono state accettate dal foglio.');
       syncWaiters.forEach(w => w.onProgress && w.onProgress(Math.max(0, w.total - queue.length), w.total));
       notify();
@@ -138,6 +142,7 @@
     if (queue.length) { flush(); return; }
     try {
       const j = await call('list', { ver: full || !server ? '' : server.ver });
+      gotPerms(j);
       if (!j.same && !queue.length) { setServer(j); notify(); }
       if (!j.same || full) lastFull = Date.now();
       status(true);
@@ -240,8 +245,9 @@
     if (j.name && j.name !== me) {
       const had = !!me;
       me = j.name; ls.set('tn', me);
-      if (had) { ['cache', 'queue', 'pf', 'seen'].forEach(k => ls.set(k, null)); location.reload(); }
+      if (had) { ['cache', 'pf', 'seen', 'tp', 'drafts'].forEach(k => ls.set(k, null)); location.reload(); }
     }
+    gotPerms(j);
   }
   function logout() {
     token = null; me = ''; server = null; queue = [];
@@ -275,7 +281,7 @@
       if (!token || !me) { await loginFlow(); closeScreen(); }
       if (!server) {
         for (;;) {
-          try { setServer(await call('list', { ver: '' })); lastFull = Date.now(); break; }
+          try { const j = await call('list', { ver: '' }); gotPerms(j); setServer(j); lastFull = Date.now(); break; }
           catch (e) {
             if (e.code === 'MUST_CHANGE') { if (!(await changeScreen(true))) await loginFlow('Accesso scaduto, entra di nuovo'); }
             else if (e.code === 'AUTH') { token = null; await loginFlow(e.message); }
@@ -332,11 +338,41 @@
     }
   };
 
+  // Riduce le immagini prima di inviarle (più veloce, sotto i limiti di Gemini).
+  function shrink(f, max) {
+    return new Promise((res, rej) => {
+      const u = URL.createObjectURL(f), im = new Image();
+      im.onload = () => {
+        const k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas');
+        c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
+        res({ mime: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.85).split(',')[1] });
+      };
+      im.onerror = () => { URL.revokeObjectURL(u); rej(new Error('Immagine non leggibile')); };
+      im.src = u;
+    });
+  }
+  const sample = {
+    limits: async () => ({ images: true }),
+    async json(prompt, opts) {
+      const images = [];
+      for (const f of (opts && opts.images) || []) images.push(await shrink(f, 1600));
+      const j = await call('ai', { prompt, images });
+      return j.result;
+    }
+  };
+
   window.claude = {
     async use(name) {
       if (name === 'db') { await ensureLogin(); return db; }
       if (name === 'user') { await ensureLogin(); return user; }
       if (name === 'downloads') return downloads;
+      if (name === 'sample') {
+        await ensureLogin();
+        // Il permesso si decide nel foglio: lo ricontrollo al volo (la risposta è leggera se i dati non sono cambiati).
+        if (!perms.includes('email')) { try { gotPerms(await call('list', { ver: server && server.ver || '' })); } catch (e) { } }
+        if (perms.includes('email')) return sample;
+      }
       throw Object.assign(new Error('Funzione non disponibile'), { code: 'UNAVAILABLE' });
     }
   };
@@ -347,6 +383,7 @@
     pending: () => queue.length,
     refresh: () => pull(true),
     bulk: enqueueMany,
+    perms: () => perms.slice(),
     waitSync
   };
 })();

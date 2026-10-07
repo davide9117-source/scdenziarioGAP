@@ -54,6 +54,17 @@ telefono/PC  ──(app web, GitHub Pages)──►  index.html + backend.js
 - **Turni**, **Calendario** (promo con obiettivi e andamento giornaliero, eventi, festività aggiunte in automatico), **Note**, e sotto *Altro*: **Storico**, **Clienti**, **Letture**, **Impostazioni**.
 - In **Impostazioni**: cambio password, uscita, gestione team, backup (scarica/ripristina JSON), pulizia automatica delle voci vecchie.
 
+## Compiti da email (IA Gemini)
+
+Chi ha il permesso trova in **Compiti** il pulsante **✉️ Da email**: incolla il testo di una mail (o allega uno screenshot), l'IA propone i compiti con date e note, e lei li controlla prima di crearli.
+
+Per attivarla (una volta sola):
+1. Crea una chiave gratuita su [aistudio.google.com/apikey](https://aistudio.google.com/apikey), con l'account `libreriateam`.
+2. Nel foglio, scheda **Impostazioni**, incolla la chiave nella cella accanto a **Chiave Gemini**.
+3. Nella scheda **Utenti**, colonna **permessi**, scrivi `email` nella riga di chi deve poter usare la funzione.
+
+La chiave resta nel foglio: non arriva mai sui telefoni né su GitHub. Il modello usato è `gemini-flash-latest`; per cambiarlo, in Apps Script → *Impostazioni progetto → Proprietà script* aggiungi `GEMINI_MODEL`.
+
 ## Il foglio, a mano
 
 Ogni riga è una voce, ogni colonna un campo (`id`, `text`, `due`, …). Si può correggere una cella o cancellare una riga direttamente nel foglio: l'app se ne accorge al prossimo aggiornamento. Non cambiare i nomi delle schede né la riga d'intestazione. Le date sono nel formato `AAAA-MM-GG`, gli orari `HH:MM`.
@@ -71,5 +82,4 @@ Solo file statici: `index.html` (interfaccia), `backend.js` (accesso, sincronizz
 ## Limiti
 
 - Non è "in tempo reale": le modifiche dei colleghi compaiono entro ~30 secondi.
-- Le funzioni "Da email" e "foto dei turni" della versione originale (usavano l'AI di claude.ai) non sono disponibili in questa versione.
 - Apps Script gratuito regge senza problemi un team di poche persone; sopra qualche migliaio di voci il foglio inizia a rallentare (la pulizia automatica in Impostazioni serve a questo).

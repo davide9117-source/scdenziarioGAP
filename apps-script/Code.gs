@@ -27,7 +27,8 @@ const COLS = {
 };
 // Campi che l'app usa come numeri: tutti gli altri numeri letti dal foglio diventano testo.
 const NUMERIC = { ts: 1, nth: 1, dom: 1, goal: 1, goalf: 1 };
-const USER_COLS = ['nome', 'hash', 'salt', 'cambioObbligatorio', 'versione', 'ultimoAccesso'];
+const USER_COLS = ['nome', 'hash', 'salt', 'cambioObbligatorio', 'versione', 'ultimoAccesso', 'permessi'];
+const AI_KEY_LABEL = 'Chiave Gemini';
 const TOKEN_DAYS = 180;
 const MIN_PW = 6;
 
@@ -55,6 +56,7 @@ function setup() {
     us.setFrozenRows(1);
     us.getRange(1, 8).setValue('Per azzerare la password di qualcuno: metti TRUE in cambioObbligatorio (entrerà con il codice squadra).');
   }
+  ensureExtras_(ss);
   Object.keys(SHEET_OF).forEach(k => ensureSheet_(ss, SHEET_OF[k], COLS[k]));
   ensureSheet_(ss, OTHER, COLS.other);
   let meta = ss.getSheetByName(META);
@@ -67,6 +69,29 @@ function setup() {
   if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(def);
   secret_();
   Logger.log('Pronto. Codice squadra: ' + conf.getRange('B1').getDisplayValue());
+}
+
+// Aggiunte successive alla prima installazione: colonna "permessi" in Utenti, riga "Chiave Gemini" in Impostazioni.
+function ensureExtras_(ss) {
+  const us = ss.getSheetByName(USERS);
+  if (us && String(us.getRange(1, 7).getValue()).trim() !== 'permessi') us.getRange(1, 7).setValue('permessi').setFontWeight('bold');
+  const conf = ss.getSheetByName(CONF);
+  if (conf && !confRow_(conf, AI_KEY_LABEL)) {
+    conf.getRange(2, 1, 1, 2).setValues([[AI_KEY_LABEL, '']]);
+    conf.getRange(4, 1).setValue('La chiave Gemini serve per "Compiti da email" (solo per chi ha "email" nella colonna permessi della scheda Utenti).');
+  }
+}
+
+function confRow_(sh, label) {
+  const v = sh.getRange(1, 1, Math.max(sh.getLastRow(), 1), 1).getValues();
+  for (let r = 0; r < v.length; r++) if (String(v[r][0]).trim().toLowerCase() === label.toLowerCase()) return r + 1;
+  return 0;
+}
+
+function confValue_(label) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(CONF);
+  const r = sh ? confRow_(sh, label) : 0;
+  return r ? String(sh.getRange(r, 2).getDisplayValue()).trim() : '';
 }
 
 function ensureSheet_(ss, name, cols) {
@@ -113,10 +138,11 @@ function handle_(req) {
   if (u.mustChange) fail_('Devi prima cambiare la password', 'MUST_CHANGE');
   if (a === 'list') {
     const ver = version_();
-    if (req.ver && String(req.ver) === ver) return { ok: true, same: true, ver: ver };
-    return withLock_(() => ({ ok: true, ver: version_(), ...loadAll_(SpreadsheetApp.getActive()).dump() }));
+    if (req.ver && String(req.ver) === ver) return { ok: true, same: true, ver: ver, perms: u.perms };
+    return withLock_(() => ({ ok: true, ver: version_(), perms: u.perms, ...loadAll_(SpreadsheetApp.getActive()).dump() }));
   }
   if (a === 'write') return withLock_(() => write_(req.ops || []));
+  if (a === 'ai') return ai_(u, req);
   fail_('Azione sconosciuta', 'BAD_ACTION');
 }
 
@@ -163,7 +189,8 @@ function users_() {
     list.push({
       row: r + 1, nome: nome, hash: String(v[r][1] || ''), salt: String(v[r][2] || ''),
       mustChange: v[r][3] === true || String(v[r][3]).toUpperCase() === 'TRUE' || !v[r][1],
-      ver: Number(v[r][4]) || 0
+      ver: Number(v[r][4]) || 0,
+      perms: String(v[r][6] || '').toLowerCase().split(/[\s,;]+/).filter(String)
     });
   }
   return { sheet: sh, list: list };
@@ -242,7 +269,7 @@ function login_(name, pw) {
     fail_(u ? 'Password errata' : 'Nome non registrato: per il primo accesso usa il codice squadra', 'BAD_LOGIN');
   }
   if (!u.mustChange) { U.sheet.getRange(u.row, 6).setValue(new Date()); }
-  return { ok: true, token: token_(u), name: u.nome, mustChange: u.mustChange };
+  return { ok: true, token: token_(u), name: u.nome, mustChange: u.mustChange, perms: u.perms || [] };
 }
 
 function setPassword_(token, oldPw, newPw) {
@@ -257,7 +284,7 @@ function setPassword_(token, oldPw, newPw) {
   cur.mustChange = false;
   cur.ver = (cur.ver || 0) + 1;
   writeUser_(U, cur);
-  return { ok: true, token: token_(cur), name: cur.nome, mustChange: false };
+  return { ok: true, token: token_(cur), name: cur.nome, mustChange: false, perms: cur.perms || [] };
 }
 
 /* ───────────── Dati ───────────── */
@@ -362,6 +389,7 @@ function clean_(d) {
 function write_(ops) {
   if (!Array.isArray(ops) || ops.length > 2000) fail_('Troppe modifiche in una volta', 'BAD_OPS');
   const db = loadAll_(SpreadsheetApp.getActive());
+  const base = version_();
   const res = [];
   ops.forEach(op => {
     const path = String(op.path || '');
@@ -399,7 +427,34 @@ function write_(ops) {
   });
   save_(db);
   bump_();
-  return { ok: true, results: res, ver: version_() };
+  return { ok: true, results: res, base: base, ver: version_() };
+}
+
+/* ───────────── IA (Gemini) ───────────── */
+
+function ai_(u, req) {
+  if (u.perms.indexOf('email') < 0) fail_('Non hai il permesso per questa funzione', 'FORBIDDEN');
+  const key = confValue_(AI_KEY_LABEL);
+  if (!key) fail_('Manca la chiave Gemini: inseriscila nel foglio, scheda Impostazioni, accanto a "' + AI_KEY_LABEL + '"', 'NO_AI_KEY');
+  const model = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') || 'gemini-flash-latest';
+  const parts = [{ text: String(req.prompt || '').slice(0, 200000) }];
+  (req.images || []).slice(0, 6).forEach(i => { if (i && i.data) parts.push({ inlineData: { mimeType: i.mime || 'image/jpeg', data: String(i.data) } }); });
+  const r = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { 'x-goog-api-key': key },
+    payload: JSON.stringify({ contents: [{ role: 'user', parts: parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2 } })
+  });
+  const code = r.getResponseCode(), body = r.getContentText();
+  if (code !== 200) {
+    let msg;
+    try { msg = JSON.parse(body).error.message; } catch (x) { msg = body.slice(0, 200); }
+    fail_('Gemini ha risposto con un errore (' + code + '): ' + msg, 'AI_ERROR');
+  }
+  const j = JSON.parse(body), c = (j.candidates || [])[0] || {};
+  const txt = ((c.content || {}).parts || []).map(p => p.text || '').join('').trim();
+  if (!txt) fail_('Gemini non ha restituito una risposta' + (c.finishReason ? ' (' + c.finishReason + ')' : ''), 'AI_EMPTY');
+  try { return { ok: true, result: JSON.parse(txt.replace(/^```(?:json)?\s*|\s*```$/g, '')) }; }
+  catch (x) { fail_('La risposta di Gemini non è leggibile, riprova', 'AI_BAD'); }
 }
 
 // Modifiche fatte a mano nel foglio: segnalo che i dati sono cambiati, così le app aperte li ricaricano al prossimo giro.
