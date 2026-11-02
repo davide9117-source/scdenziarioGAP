@@ -437,6 +437,8 @@
     cachedManual: khGet,
     getManual, putManual, restoreManual,
     manualVersions: () => call('manual_versions'),
+    // Amministrazione: il server controlla il permesso "admin" a ogni richiesta.
+    admin: (action, payload) => call('admin_' + action, payload),
     waitSync
   };
 })();

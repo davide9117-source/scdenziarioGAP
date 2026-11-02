@@ -29,6 +29,10 @@ const COLS = {
 const NUMERIC = { ts: 1, nth: 1, dom: 1, goal: 1, goalf: 1 };
 const USER_COLS = ['nome', 'hash', 'salt', 'cambioObbligatorio', 'versione', 'ultimoAccesso', 'permessi'];
 const AI_KEY_LABEL = 'Chiave Gemini';
+const AI_MODEL_LABEL = 'Modello Gemini';
+const AI_DEFAULT_MODEL = 'gemini-flash-latest';
+// Permessi che si possono dare dalla sezione Amministrazione dell'app.
+const PERMS = ['email', 'manuale', 'admin'];
 // Know How: il file del manuale, salvato a pezzi in una scheda nascosta (una cella tiene al massimo 50.000 caratteri).
 const MANUAL = '_manuale';
 const CHUNK = 40000;
@@ -92,6 +96,14 @@ function confRow_(sh, label) {
   return 0;
 }
 
+// Scrive un valore nella scheda Impostazioni, accanto alla sua etichetta (aggiunge la riga se manca).
+function confSet_(label, value) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(CONF);
+  let r = confRow_(sh, label);
+  if (!r) { r = sh.getLastRow() + 1; sh.getRange(r, 1).setValue(label); }
+  sh.getRange(r, 2).setValue(value ? "'" + value : '');
+}
+
 function confValue_(label) {
   const sh = SpreadsheetApp.getActive().getSheetByName(CONF);
   const r = sh ? confRow_(sh, label) : 0;
@@ -151,6 +163,7 @@ function handle_(req) {
   if (a === 'manual_put') return withLock_(() => manualPut_(u, req.html));
   if (a === 'manual_versions') { needPerm_(u, 'manuale'); return { ok: true, cur: manualCur_(), list: manualList_().map(x => ({ vid: x.vid, label: x.label, by: x.by, at: x.at, len: x.len })) }; }
   if (a === 'manual_restore') return withLock_(() => manualRestore_(u, req.vid));
+  if (a.indexOf('admin_') === 0) { needPerm_(u, 'admin'); return a === 'admin_ai_test' ? admin_(u, a, req) : withLock_(() => admin_(u, a, req)); }
   fail_('Azione sconosciuta', 'BAD_ACTION');
 }
 
@@ -198,6 +211,7 @@ function users_() {
       row: r + 1, nome: nome, hash: String(v[r][1] || ''), salt: String(v[r][2] || ''),
       mustChange: v[r][3] === true || String(v[r][3]).toUpperCase() === 'TRUE' || !v[r][1],
       ver: Number(v[r][4]) || 0,
+      last: Object.prototype.toString.call(v[r][5]) === '[object Date]' ? v[r][5].getTime() : 0,
       perms: String(v[r][6] || '').toLowerCase().split(/[\s,;]+/).filter(String)
     });
   }
@@ -532,13 +546,21 @@ function manualRestore_(u, vid) {
 
 /* ───────────── IA (Gemini) ───────────── */
 
+function aiModel_() {
+  return confValue_(AI_MODEL_LABEL) || PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') || AI_DEFAULT_MODEL;
+}
+
 function ai_(u, req) {
   if (u.perms.indexOf('email') < 0) fail_('Non hai il permesso per questa funzione', 'FORBIDDEN');
   const key = confValue_(AI_KEY_LABEL);
-  if (!key) fail_('Manca la chiave Gemini: inseriscila nel foglio, scheda Impostazioni, accanto a "' + AI_KEY_LABEL + '"', 'NO_AI_KEY');
-  const model = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') || 'gemini-flash-latest';
+  if (!key) fail_('Manca la chiave Gemini: chi gestisce l\'app la inserisce da Impostazioni → Amministrazione → Gemini', 'NO_AI_KEY');
   const parts = [{ text: String(req.prompt || '').slice(0, 200000) }];
   (req.images || []).slice(0, 6).forEach(i => { if (i && i.data) parts.push({ inlineData: { mimeType: i.mime || 'image/jpeg', data: String(i.data) } }); });
+  return { ok: true, result: gemini_(key, aiModel_(), parts) };
+}
+
+// Chiama Gemini e restituisce la risposta già letta come JSON.
+function gemini_(key, model, parts) {
   const r = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
     headers: { 'x-goog-api-key': key },
@@ -553,8 +575,74 @@ function ai_(u, req) {
   const j = JSON.parse(body), c = (j.candidates || [])[0] || {};
   const txt = ((c.content || {}).parts || []).map(p => p.text || '').join('').trim();
   if (!txt) fail_('Gemini non ha restituito una risposta' + (c.finishReason ? ' (' + c.finishReason + ')' : ''), 'AI_EMPTY');
-  try { return { ok: true, result: JSON.parse(txt.replace(/^```(?:json)?\s*|\s*```$/g, '')) }; }
+  try { return JSON.parse(txt.replace(/^```(?:json)?\s*|\s*```$/g, '')); }
   catch (x) { fail_('La risposta di Gemini non è leggibile, riprova', 'AI_BAD'); }
+}
+
+/* ───────────── Amministrazione (dall'app, solo con il permesso "admin") ───────────── */
+
+function mask_(k) {
+  return k ? (k.length > 10 ? k.slice(0, 4) + '…' + k.slice(-4) : '••••') : '';
+}
+
+function admin_(u, a, req) {
+  const U = users_();
+  const state = () => ({
+    ok: true,
+    code: teamCode_(),
+    ai: { key: mask_(confValue_(AI_KEY_LABEL)), model: aiModel_(), defaultModel: AI_DEFAULT_MODEL },
+    users: U.list.map(x => ({ nome: x.nome, perms: x.perms, mustChange: x.mustChange, last: x.last }))
+  });
+  if (a === 'admin_get') return state();
+  if (a === 'admin_perms') {
+    const t = findUser_(U, req.nome);
+    if (!t) fail_('Persona non trovata', 'NOT_FOUND');
+    const perms = (req.perms || []).map(String).filter(p => PERMS.indexOf(p) >= 0);
+    // Deve restare almeno una persona che può amministrare, altrimenti nessuno potrebbe più farlo dall'app.
+    if (perms.indexOf('admin') < 0 && t.perms.indexOf('admin') >= 0 && !U.list.some(x => x !== t && x.perms.indexOf('admin') >= 0))
+      fail_('Deve restare almeno una persona con il permesso di amministrare', 'LAST_ADMIN');
+    U.sheet.getRange(t.row, 7).setValue(perms.join(' '));
+    t.perms = perms;
+    return state();
+  }
+  if (a === 'admin_reset') {
+    const t = findUser_(U, req.nome);
+    if (!t) fail_('Persona non trovata', 'NOT_FOUND');
+    if (t.nome === u.nome) fail_('Per la tua password usa "Cambia password"', 'SELF');
+    // Esce da tutti i dispositivi e rientra con il codice squadra, poi sceglie una password nuova.
+    // La vecchia password non vale più: si entra solo con il codice squadra.
+    U.sheet.getRange(t.row, 2, 1, 4).setValues([['', '', true, (t.ver || 0) + 1]]);
+    t.mustChange = true;
+    return state();
+  }
+  if (a === 'admin_code') {
+    const c = String(req.code || '').trim();
+    if (!/^\S{4,30}$/.test(c)) fail_('Il codice deve avere da 4 a 30 caratteri, senza spazi', 'BAD_CODE');
+    const sh = SpreadsheetApp.getActive().getSheetByName(CONF);
+    sh.getRange('B1').setValue("'" + c);
+    return state();
+  }
+  if (a === 'admin_ai') {
+    if ('key' in req) {
+      const k = String(req.key || '').trim();
+      if (k && !/^[A-Za-z0-9_\-]{20,100}$/.test(k)) fail_('Questa non sembra una chiave Gemini: di solito inizia con "AIza" ed è lunga una quarantina di caratteri', 'BAD_KEY');
+      confSet_(AI_KEY_LABEL, k);
+    }
+    if ('model' in req) {
+      const m = String(req.model || '').trim();
+      if (m && !/^[a-z0-9.\-]{3,60}$/.test(m)) fail_('Nome del modello non valido', 'BAD_MODEL');
+      confSet_(AI_MODEL_LABEL, m);
+    }
+    return state();
+  }
+  if (a === 'admin_ai_test') {
+    const key = confValue_(AI_KEY_LABEL);
+    if (!key) fail_('Prima inserisci la chiave Gemini', 'NO_AI_KEY');
+    const t0 = Date.now(), model = aiModel_();
+    gemini_(key, model, [{ text: 'Rispondi solo con questo JSON: {"ok": true}' }]);
+    return { ok: true, model: model, ms: Date.now() - t0 };
+  }
+  fail_('Azione sconosciuta', 'BAD_ACTION');
 }
 
 // Modifiche fatte a mano nel foglio: segnalo che i dati sono cambiati, così le app aperte li ricaricano al prossimo giro.

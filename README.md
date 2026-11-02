@@ -59,7 +59,7 @@ telefono/PC  ──(app web, GitHub Pages)──►  index.html + backend.js
 
 Il manuale è un file HTML preparato da Elisa con Claude. **Non sta su GitHub** (che è pubblico, e il manuale contiene contatti e procedure interne): è salvato nel foglio Google, in una scheda nascosta `_manuale`, e l'app lo scarica solo dopo l'accesso con nome e password.
 
-**Pubblicare una nuova versione** (solo chi ha `manuale` nella colonna **permessi** della scheda **Utenti**): Impostazioni → Know How → trascina il file `.html` scaricato da Claude, oppure tocca per sfogliare. Prima di pubblicare l'app:
+**Pubblicare una nuova versione** (solo chi ha il permesso 📘 *Pubblica il Know How*): Impostazioni → Know How → trascina il file `.html` scaricato da Claude, oppure tocca per sfogliare. Prima di pubblicare l'app:
 - prova ad aprire il file e lo rifiuta se si blocca o resta vuoto;
 - controlla che `DATA_VERSION` sia cambiata (altrimenti chi ha già aperto il manuale non vedrebbe le novità);
 - mostra cosa contiene (aree, schede, glossario, contatti, quiz) e chiede conferma.
@@ -72,18 +72,25 @@ Per Elisa, quando lavora con Claude: il file deve restare **un'unica pagina HTML
 
 Chi ha il permesso trova in **Compiti** il pulsante **✉️ Da email**: incolla il testo di una mail (o allega uno screenshot), l'IA propone i compiti con date e note, e lei li controlla prima di crearli.
 
-Per attivarla (una volta sola):
-1. Crea una chiave gratuita su [aistudio.google.com/apikey](https://aistudio.google.com/apikey), con l'account `libreriateam`.
-2. Nel foglio, scheda **Impostazioni**, incolla la chiave nella cella accanto a **Chiave Gemini**.
-3. Nella scheda **Utenti**, colonna **permessi**, scrivi `email` nella riga di chi deve poter usare la funzione (più permessi si separano con uno spazio, es. `email manuale`).
+Per attivarla: Impostazioni → **Amministrazione** → **Gemini** → *Inserisci chiave* (la chiave si crea gratis su [aistudio.google.com/apikey](https://aistudio.google.com/apikey), con l'account `libreriateam`), poi *Prova il collegamento*. Chi può usare la funzione si sceglie nella stessa sezione, con il permesso **✉️ Compiti da email**.
 
-La chiave resta nel foglio: non arriva mai sui telefoni né su GitHub. Il modello usato è `gemini-flash-latest`; per cambiarlo, in Apps Script → *Impostazioni progetto → Proprietà script* aggiungi `GEMINI_MODEL`.
+La chiave resta nel foglio (scheda Impostazioni): non arriva mai sui telefoni né su GitHub. Il modello (Flash, Flash Lite, Pro) si sceglie dalla stessa sezione.
+
+## Amministrazione (dall'app)
+
+Chi ha il permesso **amministrazione** trova in Impostazioni la sezione **Amministrazione**, da cui gestisce senza aprire il foglio:
+- il **codice squadra** (vederlo, copiarlo, cambiarlo);
+- i **permessi** di ogni persona: ✉️ Compiti da email, 📘 Pubblica il Know How, ⚙️ Amministrazione (deve sempre restarne almeno una);
+- **Azzera password**: la persona esce da tutti i dispositivi e rientra con il codice squadra;
+- **Gemini**: chiave, modello, prova del collegamento.
+
+Il primo permesso di amministrazione si dà una volta sola dal foglio: scheda **Utenti**, colonna **permessi**, scrivi `admin` nella riga della persona (più permessi separati da uno spazio, es. `admin email manuale`). Da lì in poi si fa tutto dall'app.
 
 ## Il foglio, a mano
 
 Ogni riga è una voce, ogni colonna un campo (`id`, `text`, `due`, …). Si può correggere una cella o cancellare una riga direttamente nel foglio: l'app se ne accorge al prossimo aggiornamento. Non cambiare i nomi delle schede né la riga d'intestazione. Le date sono nel formato `AAAA-MM-GG`, gli orari `HH:MM`.
 
-**Password dimenticata:** nella scheda `Utenti` metti `TRUE` nella colonna `cambioObbligatorio` della persona: potrà rientrare con il codice squadra e scegliere una nuova password.
+**Password dimenticata:** da Impostazioni → Amministrazione → *Azzera password*. In alternativa, nel foglio: scheda `Utenti`, `TRUE` nella colonna `cambioObbligatorio`.
 
 ## Aggiornare lo script
 

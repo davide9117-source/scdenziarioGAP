@@ -213,6 +213,8 @@ dialog.dlg input{margin:6px 0 4px}
 dialog.dlg .prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:10px 0}dialog.dlg .prog i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
 #toast{display:none;position:fixed;left:12px;right:12px;top:calc(10px + env(safe-area-inset-top,0px));max-width:560px;margin:0 auto;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;z-index:60;font-size:15px}
 #sync{bottom:calc(var(--navh) + 10px)!important}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:22px;font-weight:700;letter-spacing:.08em;color:var(--title);margin:2px 0 8px;overflow-wrap:anywhere}
+.member .chips{flex:1 1 100%;flex-wrap:wrap;padding:0}.member .chip{min-height:34px;font-size:14px}
 
 @media (prefers-reduced-motion:no-preference){.card,.chip{transition:border-color .12s}}
 </style>
@@ -281,7 +283,7 @@ const ICO={oggi:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',co
  esci:'<path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/>',close:'<path d="M6 6l12 12M18 6L6 18"/>',
  colori:'<circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1.2"/><circle cx="12" cy="7.5" r="1.2"/><circle cx="15.5" cy="10" r="1.2"/><path d="M12 21a3 3 0 010-6h2a3 3 0 003-3"/>',
  avvisi:'<path d="M6 16v-5a6 6 0 0112 0v5l2 2H4z"/><path d="M10 20a2 2 0 004 0"/>',team:'<circle cx="9" cy="8" r="3.4"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 4.6a3.4 3.4 0 010 6.8M18 14.7c1.8.7 3 2.5 3 5.3"/>',
- backup:'<path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 20h14"/>',pulizia:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>'};
+ backup:'<path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 20h14"/>',admin:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',pulizia:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>'};
 const svgI=n=>{const w=document.createElement('span');w.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+(ICO[n]||'')+'</svg>';return w.firstChild};
 /* ----- Colori: stesso motore e stesse palette del Know How (chiave condivisa kh-theme-v1) ----- */
 const THEME_KEY='kh-theme-v1';
@@ -649,6 +651,7 @@ function renderSettings(m){
   opt('Colori','Le stesse palette del Know How: la scelta vale per tutta l\'app, Know How compreso.',colorPicker()),
   opt('Schermata iniziale','La sezione che si apre all\'avvio.',bg([['oggi','Oggi'],['compiti','Compiti'],['turni','Turni'],['manuale','Know How']],pf.start,v=>setPf('start',v))));
  khSettings(grp,opt);
+ if(teamAuth.perms().includes('admin'))adminSettings(grp,opt);
  // Notifiche
  grp('avvisi','Avvisi',null,
   opt('Novità dalle colleghe','Mostra in Oggi le ultime cose aggiunte dagli altri e un avviso quando arrivano mentre l\'app è aperta. Non ci sono notifiche a telefono chiuso.',bg([[true,'Attivi'],[false,'Disattivati']],pf.notif,v=>setPf('notif',v))));
@@ -794,6 +797,50 @@ async function khVersions(){
   buttons:[{label:'Chiudi',value:null}],cancelValue:null});
  function res_(v){(async()=>{if(!await confirmBox('Ripristinare la versione '+(v.label||'')+'?','Tutte torneranno a vedere questa versione. Quella attuale resta tra le precedenti.','Ripristina'))return;
   try{await teamAuth.restoreManual(v.vid);khFrame=null;khVer='';khState='';await dialog({title:'Versione ripristinata',body:'Ora è pubblicata la versione '+(v.label||'')+'.'});render()}catch(e){await dialog({title:'Ripristino non riuscito',body:String(e&&e.message||e)})}})()}}
+/* ======================= AMMINISTRAZIONE =======================
+   Solo con il permesso "admin": codice squadra, permessi delle persone, Gemini.
+   Il server ricontrolla il permesso a ogni richiesta. */
+let ADM=null,admBusy=false;
+function adminSettings(grp,opt){
+ const g=grp('admin','Amministrazione','Solo per chi gestisce l\'app: qui si cambia quello che prima andava fatto nel foglio Google.');
+ if(!ADM){g.append(el('p',{class:'m'},'Carico…'));if(!admBusy){admBusy=true;teamAuth.admin('get').then(r=>{ADM=r}).catch(e=>{ADM={err:e.message||String(e),code:e.code}}).finally(()=>{admBusy=false;if(tab==='impostazioni')render()})}return}
+ if(ADM.err){g.append(el('p',{class:'late'},ADM.code==='BAD_ACTION'?'Per questa sezione va aggiornato lo script del foglio Google (vedi il README).':'Non riesco a leggere le impostazioni: '+ADM.err),el('button',{class:'s',type:'button',onclick:()=>{ADM=null;render()}},'Riprova'));return}
+ const act=async(a,p,okMsg)=>{try{ADM=await teamAuth.admin(a,p);if(okMsg)toast(okMsg);if(a==='perms')teamAuth.refresh()}catch(e){await dialog({title:'Non riuscito',body:String(e&&e.message||e)})}render()};
+ // Codice squadra
+ g.append(opt('Codice squadra','Serve per il primo accesso di ogni collega e a chi ha la password azzerata.',
+  el('div',{class:'code'},ADM.code),el('div',{class:'row'},
+   el('button',{class:'s',type:'button',onclick:()=>{try{navigator.clipboard.writeText(ADM.code).then(()=>toast('Codice copiato'),()=>{})}catch(e){}}},'Copia'),
+   el('button',{class:'s',type:'button',onclick:async()=>{const c=await promptBox('Nuovo codice squadra','Da 4 a 30 caratteri, senza spazi. Chi è già entrato non deve fare niente: il codice serve solo per i primi accessi.',ADM.code,'Cambia codice');if(c&&c!==ADM.code)act('code',{code:c},'Codice squadra cambiato')}},'Cambia'))));
+ // Accessi e permessi
+ const PL=[['email','✉️ Compiti da email'],['manuale','📘 Pubblica il Know How'],['admin','⚙️ Amministrazione']];
+ const pw=opt('Accessi e permessi','Tocca un permesso per darlo o toglierlo.');
+ ADM.users.forEach(x=>{
+  const row=el('div',{class:'member'},el('div',{class:'n',style:'display:flex;align-items:center;gap:10px'},av(x.nome,34),el('div',{},x.nome,el('small',{},x.mustChange?'deve ancora scegliere la password':x.last?'ultimo accesso '+when(x.last):'non è ancora entrata'))));
+  const chips=el('div',{class:'chips'});
+  PL.forEach(([k,l])=>{const on=x.perms.includes(k);chips.append(el('button',{type:'button',class:'chip'+(on?' on':''),'aria-pressed':String(on),onclick:async()=>{
+   if(on&&k==='admin'&&x.nome===uid&&!await confirmBox('Togliti l\'amministrazione?','Non vedrai più questa sezione. Potrà ridartela solo un\'altra persona con il permesso di amministrare.','Togli',true))return;
+   act('perms',{nome:x.nome,perms:on?x.perms.filter(p=>p!==k):[...x.perms,k]},(on?'Tolto a ':'Dato a ')+x.nome+': '+l.replace(/^\S+\s/,''))}},l))});
+  row.append(chips);
+  if(x.nome!==uid)row.append(el('button',{class:'s d',type:'button',onclick:async()=>{if(await confirmBox('Azzerare la password di '+x.nome+'?',['Esce subito da tutti i suoi dispositivi.','Per rientrare userà il codice squadra ('+ADM.code+') e sceglierà una password nuova.'],'Azzera password',true))act('reset',{nome:x.nome},'Password di '+x.nome+' azzerata')}},'Azzera password'));
+  pw.append(row)});
+ g.append(pw);
+ // Gemini
+ const MODELS=[['gemini-flash-latest','Flash (consigliato: veloce, gratuito)'],['gemini-flash-lite-latest','Flash Lite (più veloce, un po\' meno preciso)'],['gemini-pro-latest','Pro (più preciso, limiti gratuiti più bassi)']];
+ const sel=el('select',{'aria-label':'Modello Gemini'});MODELS.forEach(([v,l])=>sel.append(el('option',{value:v},l)));
+ if(!MODELS.some(m=>m[0]===ADM.ai.model))sel.append(el('option',{value:ADM.ai.model},ADM.ai.model));sel.value=ADM.ai.model;
+ sel.onchange=()=>act('ai',{model:sel.value},'Modello Gemini aggiornato');
+ const test=el('button',{class:'s',type:'button',onclick:async()=>{test.disabled=true;test.textContent='Provo…';
+  try{const r=await teamAuth.admin('ai_test');await dialog({title:'Gemini risponde',body:'Collegamento riuscito con '+r.model+' in '+(r.ms/1000).toFixed(1)+' secondi.'})}
+  catch(e){await dialog({title:'Gemini non risponde',body:String(e&&e.message||e)})}test.disabled=false;test.textContent='Prova il collegamento'}},'Prova il collegamento');
+ g.append(opt('Gemini (lettura delle mail)','Serve per "Compiti da email". Chi può usarlo si sceglie qui sopra, con il permesso ✉️.',
+  el('div',{class:'h',style:'font-weight:600;color:var(--ink)'},ADM.ai.key?'Chiave impostata: '+ADM.ai.key:'Chiave non impostata: "Compiti da email" non funziona finché non la inserisci.'),
+  el('div',{class:'row'},el('button',{class:'s',type:'button',onclick:async()=>{
+    const k=await promptBox(ADM.ai.key?'Cambia la chiave Gemini':'Inserisci la chiave Gemini',el('div',{},el('p',{},'Si crea gratis su aistudio.google.com/apikey, entrando con l\'account libreriateam: copiala e incollala qui.'),el('p',{class:'m'},'La chiave resta nel foglio Google: non arriva sui telefoni delle colleghe.')),'','Salva chiave');
+    if(k)act('ai',{key:k},'Chiave Gemini salvata')}},ADM.ai.key?'Cambia chiave':'Inserisci chiave'),
+   ADM.ai.key?el('button',{class:'s d',type:'button',onclick:async()=>{if(await confirmBox('Togliere la chiave Gemini?','"Compiti da email" smette di funzionare finché non ne inserisci un\'altra.','Togli',true))act('ai',{key:''},'Chiave tolta')}},'Togli'):null),
+  el('div',{class:'h',style:'margin-top:12px'},'Modello'),sel,
+  el('div',{class:'row',style:'margin-top:10px'},test)));
+}
 const KIND_IT={task:['compito','compiti'],shift:['turno','turni'],event:['evento','eventi'],note:['nota','note'],client:['cliente','clienti'],book:['lettura','letture'],staff:['persona del team','persone del team']};
 async function restoreFile(f){
  let d;
@@ -877,7 +924,7 @@ function renderStorico(m){
 }
 const busy=()=>{const a=document.activeElement;return !!(adding||editing||completing||review||mailOpen||photoPrev||fixPrev)||!!document.querySelector('dialog[open]')||!!(a&&a.closest&&a.closest('#main')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))};
 document.addEventListener('focusout',()=>setTimeout(()=>{if(pending&&!busy())render()},400));
-function go(t){if(t==='manuale'&&Array.isArray(khState))khState='';tab=t;closeDrawer();editing=completing=adding=review=photoPrev=fixPrev=null;mailOpen=false;xlMsg='';render();window.scrollTo(0,0)}
+function go(t){if(t==='impostazioni')ADM=null;if(t==='manuale'&&Array.isArray(khState))khState='';tab=t;closeDrawer();editing=completing=adding=review=photoPrev=fixPrev=null;mailOpen=false;xlMsg='';render();window.scrollTo(0,0)}
 const NAV=['oggi','compiti','turni','eventi','manuale'];
 function drawNav(LN){const nav=document.getElementById('nav'),wrap=el('div',{class:'in'});
  NAV.forEach(t=>{const b=el('button',{type:'button',onclick:()=>go(t)},svgI(t),el('span',{},LAB[t]),(t==='oggi'||t==='compiti')&&LN?el('b',{class:'bdg'},String(LN)):null);if(t===tab)b.setAttribute('aria-current','page');wrap.append(b)});
