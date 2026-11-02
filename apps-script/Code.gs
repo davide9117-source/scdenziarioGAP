@@ -29,6 +29,10 @@ const COLS = {
 const NUMERIC = { ts: 1, nth: 1, dom: 1, goal: 1, goalf: 1 };
 const USER_COLS = ['nome', 'hash', 'salt', 'cambioObbligatorio', 'versione', 'ultimoAccesso', 'permessi'];
 const AI_KEY_LABEL = 'Chiave Gemini';
+// Know How: il file del manuale, salvato a pezzi in una scheda nascosta (una cella tiene al massimo 50.000 caratteri).
+const MANUAL = '_manuale';
+const CHUNK = 40000;
+const KEEP_VERSIONS = 3;
 const TOKEN_DAYS = 180;
 const MIN_PW = 6;
 
@@ -138,11 +142,15 @@ function handle_(req) {
   if (u.mustChange) fail_('Devi prima cambiare la password', 'MUST_CHANGE');
   if (a === 'list') {
     const ver = version_();
-    if (req.ver && String(req.ver) === ver) return { ok: true, same: true, ver: ver, perms: u.perms };
-    return withLock_(() => ({ ok: true, ver: version_(), perms: u.perms, ...loadAll_(SpreadsheetApp.getActive()).dump() }));
+    if (req.ver && String(req.ver) === ver) return { ok: true, same: true, ver: ver, perms: u.perms, mver: manualCur_() };
+    return withLock_(() => ({ ok: true, ver: version_(), perms: u.perms, mver: manualCur_(), ...loadAll_(SpreadsheetApp.getActive()).dump() }));
   }
   if (a === 'write') return withLock_(() => write_(req.ops || []));
   if (a === 'ai') return ai_(u, req);
+  if (a === 'manual_get') return manualGet_(req);
+  if (a === 'manual_put') return withLock_(() => manualPut_(u, req.html));
+  if (a === 'manual_versions') { needPerm_(u, 'manuale'); return { ok: true, cur: manualCur_(), list: manualList_().map(x => ({ vid: x.vid, label: x.label, by: x.by, at: x.at, len: x.len })) }; }
+  if (a === 'manual_restore') return withLock_(() => manualRestore_(u, req.vid));
   fail_('Azione sconosciuta', 'BAD_ACTION');
 }
 
@@ -428,6 +436,98 @@ function write_(ops) {
   save_(db);
   bump_();
   return { ok: true, results: res, base: base, ver: version_() };
+}
+
+/* ───────────── Know How (manuale) ───────────── */
+
+function needPerm_(u, p) {
+  if (u.perms.indexOf(p) < 0) fail_('Non hai il permesso per questa funzione', 'FORBIDDEN');
+}
+
+function manualSheet_() {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(MANUAL);
+  if (!sh) {
+    sh = ss.insertSheet(MANUAL);
+    sh.getRange(1, 1, 1, 3).setValues([['versione', 'parte', 'testo']]);
+    sh.hideSheet();
+  }
+  return sh;
+}
+
+function manualCur_() {
+  return PropertiesService.getScriptProperties().getProperty('man_cur') || '';
+}
+
+function manualList_() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('man_list') || '[]'); } catch (x) { return []; }
+}
+
+function digest_(s) {
+  return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, s, Utilities.Charset.UTF_8));
+}
+
+function manualRead_(vid) {
+  const v = manualSheet_().getDataRange().getValues();
+  return v.slice(1).filter(r => String(r[0]) === vid).sort((a, b) => Number(a[1]) - Number(b[1])).map(r => String(r[2])).join('');
+}
+
+// Tiene solo le righe delle versioni indicate.
+function manualPrune_(keep) {
+  const sh = manualSheet_(), v = sh.getDataRange().getValues();
+  const rows = v.slice(1).filter(r => keep.indexOf(String(r[0])) >= 0);
+  if (rows.length === v.length - 1) return;
+  if (v.length > 1) sh.getRange(2, 1, v.length - 1, 3).clearContent();
+  if (rows.length) sh.getRange(2, 1, rows.length, 3).setValues(rows.map(r => [String(r[0]), r[1], "'" + String(r[2])]));
+}
+
+function manualGet_(req) {
+  const cur = manualCur_();
+  if (!cur) return { ok: true, none: true };
+  if (req.ver && String(req.ver) === cur) return { ok: true, same: true, ver: cur };
+  const info = manualList_().find(x => x.vid === cur) || { vid: cur };
+  const html = manualRead_(cur);
+  if (!html || (info.hash && digest_(html) !== info.hash)) fail_('Il Know How salvato nel foglio non è integro: chi ha il permesso può ripristinare una versione precedente', 'CORRUPT');
+  return { ok: true, ver: cur, info: { vid: cur, label: info.label || '', by: info.by || '', at: info.at || 0, len: html.length }, html: html };
+}
+
+function manualPut_(u, html) {
+  needPerm_(u, 'manuale');
+  html = String(html || '').replace(/\r\n?/g, '\n');
+  if (html.length < 500 || html.length > 8000000) fail_('Il file non sembra il manuale (dimensione non valida)', 'BAD_FILE');
+  const m = html.match(/DATA_VERSION\s*=\s*["']([^"']+)["']/);
+  const vid = 'v' + Date.now();
+  const rows = [];
+  for (let i = 0, k = 0; i < html.length; k++) {
+    let j = Math.min(i + CHUNK, html.length);
+    const c = html.charCodeAt(j - 1);
+    if (j < html.length && c >= 0xD800 && c <= 0xDBFF) j--; // non spezzo le emoji a metà
+    rows.push([vid, k, "'" + html.slice(i, j)]);
+    i = j;
+  }
+  const sh = manualSheet_(), start = sh.getLastRow() + 1;
+  if (sh.getMaxRows() < start + rows.length) sh.insertRowsAfter(sh.getMaxRows(), start + rows.length - sh.getMaxRows());
+  sh.getRange(start, 1, rows.length, 3).setValues(rows);
+  SpreadsheetApp.flush();
+  // Rileggo e confronto: pubblico solo se il foglio contiene esattamente il file caricato.
+  if (manualRead_(vid) !== html) {
+    manualPrune_(manualList_().map(x => x.vid));
+    fail_('Il salvataggio nel foglio non è andato a buon fine: niente è cambiato, riprova', 'SAVE_FAILED');
+  }
+  const info = { vid: vid, label: m ? m[1] : '', by: u.nome, at: Date.now(), len: html.length, hash: digest_(html) };
+  const list = [info].concat(manualList_()).slice(0, KEEP_VERSIONS);
+  const p = PropertiesService.getScriptProperties();
+  p.setProperty('man_list', JSON.stringify(list));
+  p.setProperty('man_cur', vid);
+  manualPrune_(list.map(x => x.vid));
+  return { ok: true, info: { vid: vid, label: info.label, by: info.by, at: info.at, len: info.len } };
+}
+
+function manualRestore_(u, vid) {
+  needPerm_(u, 'manuale');
+  if (!manualList_().some(x => x.vid === vid)) fail_('Versione non trovata', 'NOT_FOUND');
+  PropertiesService.getScriptProperties().setProperty('man_cur', String(vid));
+  return { ok: true };
 }
 
 /* ───────────── IA (Gemini) ───────────── */

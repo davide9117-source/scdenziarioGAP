@@ -15,7 +15,54 @@
   const apiUrl = () => (ls.get('apiUrl') || (window.APP_CONFIG && window.APP_CONFIG.apiUrl) || '').trim();
 
   let token = ls.get('tk'), me = ls.get('tn') || '', perms = ls.json('tp', []);
-  function gotPerms(j) { if (j && Array.isArray(j.perms)) { perms = j.perms; ls.set('tp', JSON.stringify(perms)); } }
+  let mver = ls.get('mver') || '';
+  function gotPerms(j) {
+    if (j && Array.isArray(j.perms)) { perms = j.perms; ls.set('tp', JSON.stringify(perms)); }
+    if (j && 'mver' in j) { mver = j.mver || ''; ls.set('mver', mver); }
+  }
+
+  /* ── Know How: il file del manuale, scaricato solo dopo l'accesso e tenuto sul dispositivo ── */
+  const KHC = 'kh-file', KHK = location.origin + '/__know-how';
+  let khMem = null;
+  async function khGet() {
+    if (khMem) return khMem;
+    try {
+      const r = await (await caches.open(KHC)).match(KHK);
+      if (!r) return null;
+      khMem = { html: await r.text(), ver: r.headers.get('x-ver') || '', info: JSON.parse(decodeURIComponent(r.headers.get('x-info') || '') || 'null') };
+      return khMem;
+    } catch (e) { return null; }
+  }
+  async function khPut(o) {
+    khMem = o; ls.set('kh-info', JSON.stringify(o.info || null));
+    try { await (await caches.open(KHC)).put(KHK, new Response(o.html, { headers: { 'content-type': 'text/html; charset=utf-8', 'x-ver': o.ver, 'x-info': encodeURIComponent(JSON.stringify(o.info || null)) } })); } catch (e) { }
+  }
+  async function getManual() {
+    await ensureLogin();
+    const c = await khGet();
+    if (c && c.ver && c.ver === mver) return c;
+    try {
+      const j = await call('manual_get', { ver: c ? c.ver : '' });
+      if (j.none) return { none: true };
+      if (j.same) return c;
+      const o = { html: j.html, ver: j.ver, info: j.info || null };
+      await khPut(o); mver = j.ver; ls.set('mver', mver);
+      return o;
+    } catch (e) {
+      if (c) return c;
+      return { error: e.message, code: e.code };
+    }
+  }
+  async function putManual(html) {
+    const j = await call('manual_put', { html });
+    await khPut({ html, ver: j.info.vid, info: j.info }); mver = j.info.vid; ls.set('mver', mver);
+    return j.info;
+  }
+  async function restoreManual(vid) {
+    await call('manual_restore', { vid });
+    khMem = null; try { await caches.delete(KHC); } catch (e) { }
+    mver = vid; ls.set('mver', mver);
+  }
   let server = ls.json('cache', null);           // {items:[], meta:{}, ver}
   let queue = ls.json('queue', []);              // modifiche non ancora salvate sul foglio
   const listeners = new Set();
@@ -174,7 +221,7 @@
 
   /* ── Accesso ── */
   const CSS = `#login{position:fixed;inset:0;z-index:50;background:var(--bg);overflow:auto;padding:calc(24px + env(safe-area-inset-top,0px)) 16px 24px}
-#login .box{max-width:420px;margin:0 auto}#login h1{margin:10px 0 4px}#login p{color:var(--mu);font-size:14px;margin:6px 0 16px}
+#login .box{max-width:420px;margin:0 auto}#login h1{margin:10px 0 4px;font-family:var(--display,inherit);color:var(--title,inherit)}#login p{color:var(--mu);font-size:14px;margin:6px 0 16px}
 #login form{display:grid;gap:10px}#login .err{color:#d64533;font-size:14px;min-height:1em}
 #sync{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(74px + env(safe-area-inset-bottom,0px));background:var(--tx);color:var(--bg);padding:4px 12px;border-radius:12px;font:13px system-ui,sans-serif;z-index:25;opacity:.9}`;
   function styleOnce() { if (!document.getElementById('loginCss')) { const s = document.createElement('style'); s.id = 'loginCss'; s.textContent = CSS; document.head.append(s); } }
@@ -251,8 +298,9 @@
   }
   function logout() {
     token = null; me = ''; server = null; queue = [];
-    ['tk', 'tn', 'cache', 'queue', 'pf', 'seen'].forEach(k => ls.set(k, null));
-    location.reload();
+    // Anche il manuale è dietro la password: all'uscita tolgo la copia salvata sul dispositivo.
+    ['tk', 'tn', 'cache', 'queue', 'pf', 'seen', 'mver', 'kh-info', 'kh-state-v1'].forEach(k => ls.set(k, null));
+    Promise.resolve(window.caches && caches.delete(KHC)).catch(() => { }).finally(() => location.reload());
   }
   let relogging = false;
   async function needLogin(code) {
@@ -384,6 +432,11 @@
     refresh: () => pull(true),
     bulk: enqueueMany,
     perms: () => perms.slice(),
+    manualVer: () => mver,
+    manualInfo: () => ls.json('kh-info', null),
+    cachedManual: khGet,
+    getManual, putManual, restoreManual,
+    manualVersions: () => call('manual_versions'),
     waitSync
   };
 })();

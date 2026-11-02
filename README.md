@@ -51,8 +51,22 @@ telefono/PC  ──(app web, GitHub Pages)──►  index.html + backend.js
 
 - **Oggi**: compiti del giorno, chi è in turno, promo in corso, ritardi, novità dei colleghi.
 - **Compiti**: ricorrenti (ogni giorno, giorni fissi della settimana, ogni mese, "il secondo martedì"…) o con scadenza / periodo; spunta con nome di chi l'ha fatto.
-- **Turni**, **Calendario** (promo con obiettivi e andamento giornaliero, eventi, festività aggiunte in automatico), **Note**, e sotto *Altro*: **Storico**, **Clienti**, **Letture**, **Impostazioni**.
-- In **Impostazioni**: cambio password, uscita, gestione team, backup (scarica/ripristina JSON), pulizia automatica delle voci vecchie.
+- **Turni**, **Calendario** (promo ed eventi con obiettivi e andamento giornaliero, festività aggiunte in automatico) e **Know How** (il manuale di lavoro).
+- Barra in basso: **Oggi · Compiti · Turni · Calendario · Know How**. Il menu ☰ in alto apre tutte le sezioni: anche **Note**, **Clienti**, **Letture**, **Storico**, **Impostazioni**.
+- In **Impostazioni**: avatar, password, colori (le stesse palette del Know How), team, Know How, backup, pulizia automatica delle voci vecchie.
+
+## Know How (manuale di lavoro)
+
+Il manuale è un file HTML preparato da Elisa con Claude. **Non sta su GitHub** (che è pubblico, e il manuale contiene contatti e procedure interne): è salvato nel foglio Google, in una scheda nascosta `_manuale`, e l'app lo scarica solo dopo l'accesso con nome e password.
+
+**Pubblicare una nuova versione** (solo chi ha `manuale` nella colonna **permessi** della scheda **Utenti**): Impostazioni → Know How → trascina il file `.html` scaricato da Claude, oppure tocca per sfogliare. Prima di pubblicare l'app:
+- prova ad aprire il file e lo rifiuta se si blocca o resta vuoto;
+- controlla che `DATA_VERSION` sia cambiata (altrimenti chi ha già aperto il manuale non vedrebbe le novità);
+- mostra cosa contiene (aree, schede, glossario, contatti, quiz) e chiede conferma.
+
+Restano le ultime **3 versioni**: da *Vedi le versioni* si può tornare a una precedente. Nell'app il tasto "Modifica contenuti" del manuale è nascosto: le modifiche passano dal file di Elisa. Colori: la palette scelta nel Know How o nelle Impostazioni dell'app vale per entrambi.
+
+Per Elisa, quando lavora con Claude: il file deve restare **un'unica pagina HTML** che funziona da sola, e a ogni modifica dei contenuti va aumentato `DATA_VERSION`.
 
 ## Compiti da email (IA Gemini)
 
@@ -61,7 +75,7 @@ Chi ha il permesso trova in **Compiti** il pulsante **✉️ Da email**: incolla
 Per attivarla (una volta sola):
 1. Crea una chiave gratuita su [aistudio.google.com/apikey](https://aistudio.google.com/apikey), con l'account `libreriateam`.
 2. Nel foglio, scheda **Impostazioni**, incolla la chiave nella cella accanto a **Chiave Gemini**.
-3. Nella scheda **Utenti**, colonna **permessi**, scrivi `email` nella riga di chi deve poter usare la funzione.
+3. Nella scheda **Utenti**, colonna **permessi**, scrivi `email` nella riga di chi deve poter usare la funzione (più permessi si separano con uno spazio, es. `email manuale`).
 
 La chiave resta nel foglio: non arriva mai sui telefoni né su GitHub. Il modello usato è `gemini-flash-latest`; per cambiarlo, in Apps Script → *Impostazioni progetto → Proprietà script* aggiungi `GEMINI_MODEL`.
 
@@ -77,7 +91,7 @@ Se `apps-script/Code.gs` cambia: incolla la nuova versione in Apps Script, salva
 
 ## Sviluppo
 
-Solo file statici: `index.html` (interfaccia), `backend.js` (accesso, sincronizzazione, cache offline), `sw.js` (service worker), `manifest.webmanifest`, `icons/`. Per provarla in locale basta un server statico (es. `npx http-server .`); senza HTTPS il service worker non viene registrato ma il resto funziona.
+Solo file statici: `index.html` (interfaccia; lo stile e i colori ricalcano quelli del Know How), `backend.js` (accesso, sincronizzazione, cache offline, scaricamento del Know How), `sw.js` (service worker), `manifest.webmanifest`, `icons/`. Per provarla in locale basta un server statico (es. `npx http-server .`); senza HTTPS il service worker non viene registrato ma il resto funziona.
 
 ## Limiti
 
