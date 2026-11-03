@@ -26,9 +26,11 @@ telefono/PC  ──(app web, GitHub Pages)──►  index.html + backend.js
 1. Apri [sheets.google.com](https://sheets.google.com) con l'account che farà da "proprietario" e crea un foglio nuovo (va bene anche uno già creato: lo script aggiunge le schede che mancano e non tocca il resto).
 2. Menu **Estensioni → Apps Script**.
 3. Cancella il contenuto di `Codice.gs`, incolla tutto il contenuto di [`apps-script/Code.gs`](apps-script/Code.gs) e salva (icona del dischetto).
-4. In alto, nel menu a tendina delle funzioni, scegli **`setup`** e premi **Esegui**. Alla prima esecuzione Google chiede l'autorizzazione: *Rivedi autorizzazioni → scegli l'account → Avanzate → Vai a … (non sicuro) → Consenti*. È normale: lo script è tuo e gira sul tuo account.
-5. Torna al foglio: trovi le schede `Compiti`, `Turni`, `Eventi`, `Note`, `Clienti`, `Letture`, `Team`, `Utenti`, `Impostazioni`. Nella scheda **Impostazioni** c'è il **codice squadra** (puoi cambiarlo quando vuoi).
-6. Di nuovo in Apps Script: **Distribuisci → Nuova distribuzione**. Tipo: **App web**. Descrizione a piacere. *Esegui come:* **Me**. *Chi ha accesso:* **Chiunque**. Premi **Distribuisci** e copia l'**URL dell'app web** (finisce con `/exec`).
+4. Clicca l'ingranaggio **Impostazioni progetto** e spunta **"Mostra il file manifest appsscript.json nell'editor"**. Torna all'editor, apri `appsscript.json`, cancella tutto, incolla il contenuto di [`apps-script/appsscript.json`](apps-script/appsscript.json) e salva.
+5. Apri [script.google.com/home/usersettings](https://script.google.com/home/usersettings) e metti **API Google Apps Script** su **Attiva** (serve perché lo script possa aggiornarsi da solo).
+6. In alto, nel menu a tendina delle funzioni, scegli **`setup`** e premi **Esegui**. Alla prima esecuzione Google chiede l'autorizzazione: *Rivedi autorizzazioni → scegli l'account → Avanzate → Vai a … (non sicuro) → Consenti*. È normale: lo script è tuo e gira sul tuo account.
+7. Torna al foglio: trovi le schede `Compiti`, `Turni`, `Eventi`, `Note`, `Clienti`, `Letture`, `Team`, `Utenti`, `Impostazioni`. Nella scheda **Impostazioni** c'è il **codice squadra** (puoi cambiarlo quando vuoi).
+8. Di nuovo in Apps Script: **Distribuisci → Nuova distribuzione**. Tipo: **App web**. Descrizione a piacere. *Esegui come:* **Me**. *Chi ha accesso:* **Chiunque**. Premi **Distribuisci** e copia l'**URL dell'app web** (finisce con `/exec`).
 
 > "Chi ha accesso: Chiunque" serve perché l'app la usano persone senza account Google. La protezione è la password di ogni collega: senza, lo script non restituisce né accetta nulla.
 
@@ -94,9 +96,15 @@ Ogni riga è una voce, ogni colonna un campo (`id`, `text`, `due`, …). Si può
 
 ## Aggiornare lo script
 
-Se `apps-script/Code.gs` cambia: incolla la nuova versione in Apps Script, salva, poi **Distribuisci → Gestisci distribuzioni → ✎ (modifica) → Versione: Nuova versione → Distribuisci**. L'URL resta lo stesso.
+**Da dentro l'app, senza aprire Google:** Impostazioni → Amministrazione → **Script del foglio Google** → *Aggiorna lo script*. Lo script scarica da GitHub la versione nuova di `Code.gs`, la installa, crea una nuova versione e la assegna alla distribuzione dell'app: l'indirizzo `/exec` resta lo stesso. Quando c'è un aggiornamento, chi amministra lo vede anche in **Oggi**.
+
+Perché funzioni, lo script installato deve essere quello di novembre 2026 o successivo, con `appsscript.json` del repository e l'API Apps Script attiva (passi 3–5 dell'installazione).
+
+**A mano (solo se l'aggiornamento dall'app non riesce):** incolla la nuova versione di `Code.gs` in Apps Script, salva, poi **Distribuisci → Gestisci distribuzioni → ✎ (modifica) → Versione: Nuova versione → Distribuisci**. L'URL resta lo stesso.
 
 ## Sviluppo
+
+Quando cambia `apps-script/Code.gs`, aumentare `SCRIPT_VERSION` nello script e `NEED_SCRIPT` in `index.html` (stesso valore): così chi amministra vede l'aggiornamento da installare.
 
 Solo file statici: `index.html` (interfaccia; lo stile e i colori ricalcano quelli del Know How), `backend.js` (accesso, sincronizzazione, cache offline, scaricamento del Know How), `sw.js` (service worker), `manifest.webmanifest`, `icons/`. Per provarla in locale basta un server statico (es. `npx http-server .`); senza HTTPS il service worker non viene registrato ma il resto funziona.
 

@@ -15,10 +15,11 @@
   const apiUrl = () => (ls.get('apiUrl') || (window.APP_CONFIG && window.APP_CONFIG.apiUrl) || '').trim();
 
   let token = ls.get('tk'), me = ls.get('tn') || '', perms = ls.json('tp', []);
-  let mver = ls.get('mver') || '';
+  let mver = ls.get('mver') || '', sver = ls.get('sv') || '';
   function gotPerms(j) {
     if (j && Array.isArray(j.perms)) { perms = j.perms; ls.set('tp', JSON.stringify(perms)); }
     if (j && 'mver' in j) { mver = j.mver || ''; ls.set('mver', mver); }
+    if (j && j.perms) { sver = j.sv || ''; ls.set('sv', sver); }
   }
 
   /* ── Know How: il file del manuale, scaricato solo dopo l'accesso e tenuto sul dispositivo ── */
@@ -439,6 +440,9 @@
     manualVersions: () => call('manual_versions'),
     // Amministrazione: il server controlla il permesso "admin" a ogni richiesta.
     admin: (action, payload) => call('admin_' + action, payload),
+    scriptVer: () => sver,
+    // L'indirizzo /macros/s/<id>/exec contiene l'id della distribuzione da aggiornare.
+    deploymentId: () => ((apiUrl().match(/\/macros\/s\/([^/]+)\//) || [])[1] || ''),
     waitSync
   };
 })();

@@ -507,7 +507,7 @@ function mailBox(){
    const ev=r.event&&r.event.title&&r.event.start?{...r.event,ptype:['Sell in','Sell out','Gadget'].includes(r.event.ptype)?r.event.ptype:'',on:true}:null;
    const got=new Set([...T.flatMap(t=>[t.start,t.due]),ev&&ev.start,ev&&ev.end,ev&&ev.cstart,ev&&ev.cend]);
    review={T,ev,miss:mailDates(txt).filter(d=>!got.has(d))};mailOpen=false;render()}
-  catch(e){btn.disabled=false;btn.textContent='Leggi la mail';if(!e||e.code!=='cancelled')dialog({title:'Non sono riuscita a leggere la mail',body:String(e&&e.message||e&&e.code||'errore')})}
+  catch(e){btn.disabled=false;btn.textContent='Leggi la mail';if(!e||e.code!=='cancelled'){const m=String(e&&e.message||e&&e.code||'errore'),h=geminiHelp(m+' '+(e&&e.code||''));dialog({title:'Non sono riuscita a leggere la mail',body:h?[h,el('p',{class:'m'},'Dettaglio: '+m)]:m})}}
  }},'Leggi la mail');
  return el('form',{},el('div',{class:'m'},'Incolla il testo della mail. Ti propongo i compiti da controllare prima di salvarli.'),ta,btn);
 }
@@ -801,11 +801,34 @@ async function khVersions(){
    Solo con il permesso "admin": codice squadra, permessi delle persone, Gemini.
    Il server ricontrolla il permesso a ogni richiesta. */
 let ADM=null,admBusy=false;
+// Versione dello script Google pensata per questa versione dell'app (apps-script/Code.gs, SCRIPT_VERSION).
+const NEED_SCRIPT='2026-11-03';
+const scriptOld=()=>{const v=teamAuth.scriptVer();return !v||v<NEED_SCRIPT};
+// Spiega in parole semplici gli errori di Gemini.
+function geminiHelp(msg){msg=String(msg||'');
+ if(/API key not valid|API_KEY_INVALID|invalid api key/i.test(msg))return 'La chiave non è valida. Ricopiala per intero da aistudio.google.com/apikey (senza spazi prima o dopo) e reinseriscila in Impostazioni → Amministrazione → Gemini.';
+ if(/429|RESOURCE_EXHAUSTED|quota|rate limit/i.test(msg))return 'Gemini ha ricevuto troppe richieste o è finito il limite gratuito di oggi. Riprova tra qualche minuto (o domani); se succede spesso, scegli il modello Flash Lite.';
+ if(/404|not found|NOT_FOUND/i.test(msg))return 'Il modello scelto non è disponibile. In Impostazioni → Amministrazione → Gemini scegli "Flash".';
+ if(/403|PERMISSION_DENIED|permission/i.test(msg))return 'La chiave non ha il permesso di usare Gemini. Creane una nuova da aistudio.google.com/apikey con l\'account libreriateam e inseriscila al posto di questa.';
+ if(/location|region|country/i.test(msg))return 'Google dice che Gemini non è disponibile da qui per questo account.';
+ if(/NO_AI_KEY|Manca la chiave/i.test(msg))return 'Manca la chiave Gemini: chi amministra l\'app la inserisce da Impostazioni → Amministrazione → Gemini (ci sono le istruzioni passo per passo).';
+ if(/connessione|OFFLINE|Failed to fetch/i.test(msg))return 'Il telefono non riesce a collegarsi: controlla la connessione e riprova.';
+ return ''}
 function adminSettings(grp,opt){
  const g=grp('admin','Amministrazione','Solo per chi gestisce l\'app: qui si cambia quello che prima andava fatto nel foglio Google.');
  if(!ADM){g.append(el('p',{class:'m'},'Carico…'));if(!admBusy){admBusy=true;teamAuth.admin('get').then(r=>{ADM=r}).catch(e=>{ADM={err:e.message||String(e),code:e.code}}).finally(()=>{admBusy=false;if(tab==='impostazioni')render()})}return}
  if(ADM.err){g.append(el('p',{class:'late'},ADM.code==='BAD_ACTION'?'Per questa sezione va aggiornato lo script del foglio Google (vedi il README).':'Non riesco a leggere le impostazioni: '+ADM.err),el('button',{class:'s',type:'button',onclick:()=>{ADM=null;render()}},'Riprova'));return}
  const act=async(a,p,okMsg)=>{try{ADM=await teamAuth.admin(a,p);if(okMsg)toast(okMsg);if(a==='perms')teamAuth.refresh()}catch(e){await dialog({title:'Non riuscito',body:String(e&&e.message||e)})}render()};
+ // Script del foglio Google: si aggiorna da solo, senza incollare niente
+ const sv=ADM.sv||teamAuth.scriptVer(),old=!sv||sv<NEED_SCRIPT;
+ const upd=el('button',{class:old?'p':'s',type:'button',onclick:async()=>{
+  if(!old){upd.disabled=true;upd.textContent='Controllo…';try{const r=await teamAuth.admin('script_check');if(r.latest===r.current){await dialog({title:'Script aggiornato',body:'Lo script del foglio è già all\'ultima versione ('+r.current+').'});upd.disabled=false;upd.textContent='Controlla aggiornamenti';return}}catch(e){await dialog({title:'Controllo non riuscito',body:String(e&&e.message||e)});upd.disabled=false;upd.textContent='Controlla aggiornamenti';return}}
+  if(!await confirmBox('Aggiornare lo script del foglio?',['Lo script scarica la versione nuova da GitHub e la installa da solo. Ci vuole meno di un minuto e l\'app resta utilizzabile.','Se qualcosa non va, l\'app ti dice cosa fare: la versione attuale continua a funzionare.'],'Aggiorna'))return;
+  let pd;dialog({title:'Aggiorno lo script…',body:[el('p',{},'Non chiudere l\'app.'),el('div',{class:'prog'},el('i',{style:'width:70%'}))],buttons:[],locked:true,onopen:d=>pd=d});
+  try{const r=await teamAuth.admin('script_update',{deployment:teamAuth.deploymentId()});if(pd){pd.close();pd.remove()}
+   await dialog({title:r.same?'Script già aggiornato':'Script aggiornato',body:r.same?'Era già all\'ultima versione.':'Installata la versione '+r.to+'. Da ora le funzioni nuove sono attive per tutte.'});ADM=null;teamAuth.refresh();render()}
+  catch(e){if(pd){pd.close();pd.remove()}await dialog({title:'Aggiornamento non riuscito',body:[String(e&&e.message||e),el('p',{class:'m'},'Lo script di prima continua a funzionare. Se il messaggio non è chiaro, mandalo a chi segue l\'app.')]})}}},old?'Aggiorna lo script':'Controlla aggiornamenti');
+ g.append(opt('Script del foglio Google',old?'C\'è una versione nuova dello script (quella installata è '+(sv||'precedente a novembre')+'). Si installa da qui, senza aprire Google.':'Aggiornato (versione '+sv+'). Quando ce n\'è una nuova, qui compare il pulsante per installarla.',el('div',{class:'row'},upd)));
  // Codice squadra
  g.append(opt('Codice squadra','Serve per il primo accesso di ogni collega e a chi ha la password azzerata.',
   el('div',{class:'code'},ADM.code),el('div',{class:'row'},
@@ -831,9 +854,24 @@ function adminSettings(grp,opt){
  sel.onchange=()=>act('ai',{model:sel.value},'Modello Gemini aggiornato');
  const test=el('button',{class:'s',type:'button',onclick:async()=>{test.disabled=true;test.textContent='Provo…';
   try{const r=await teamAuth.admin('ai_test');await dialog({title:'Gemini risponde',body:'Collegamento riuscito con '+r.model+' in '+(r.ms/1000).toFixed(1)+' secondi.'})}
-  catch(e){await dialog({title:'Gemini non risponde',body:String(e&&e.message||e)})}test.disabled=false;test.textContent='Prova il collegamento'}},'Prova il collegamento');
+  catch(e){const m=String(e&&e.message||e),h=geminiHelp(m+' '+(e&&e.code||''));await dialog({title:'Gemini non risponde',body:h?[h,el('p',{class:'m'},'Dettaglio: '+m)]:m})}test.disabled=false;test.textContent='Prova il collegamento'}},'Prova il collegamento');
+ const step=(n,...k)=>el('li',{style:'margin-bottom:6px'},...k);
+ const guide=el('details',{},el('summary',{},'Come si attiva, passo per passo'),el('div',{style:'padding:0 2px'},
+  el('p',{},'Gemini è l\'intelligenza artificiale di Google che legge le mail incollate in Compiti → "✉️ Da email" e propone i compiti. Per usarla serve una "chiave": un codice gratuito che si crea una volta sola.'),
+  el('ol',{style:'padding-left:22px;margin:8px 0'},
+   step(1,'Apri ',el('a',{href:'https://aistudio.google.com/apikey',target:'_blank',rel:'noopener'},'aistudio.google.com/apikey'),' (va bene dal computer o dal telefono).'),
+   step(2,'Entra con l\'account ',el('b',{},'libreriateam@gmail.com'),'. In alto a destra controlla che sia proprio quello. Se è la prima volta, accetta le condizioni di Google AI Studio.'),
+   step(3,'Premi ',el('b',{},'"Create API key"'),' (oppure "Crea chiave API"). Se chiede un progetto, accetta quello proposto o scegli "Create API key in new project".'),
+   step(4,'Compare una chiave lunga che inizia con ',el('b',{},'AIza'),'. Premi l\'icona per copiarla.'),
+   step(5,'Torna qui, premi ',el('b',{},'"Inserisci chiave"'),', incollala e premi Salva.'),
+   step(6,'Premi ',el('b',{},'"Prova il collegamento"'),': se compare "Gemini risponde", è tutto pronto.'),
+   step(7,'In "Accessi e permessi", qui sopra, accendi ',el('b',{},'✉️ Compiti da email'),' per chi deve usarlo.')),
+  el('p',{style:'margin-top:10px'},el('b',{},'Quale modello? '),'Flash va bene quasi sempre: è veloce e gratuito. Flash Lite se compare spesso "troppe richieste". Pro solo per mail molto complicate: è più lento e il piano gratuito ne permette poche al giorno.'),
+  el('p',{},el('b',{},'Quanto costa? '),'Niente, entro i limiti del piano gratuito di Google, che bastano per molte mail al giorno. Attenzione: nel piano gratuito Google può usare i testi inviati per migliorare i suoi servizi. Se nelle mail ci sono dati riservati, su AI Studio si può attivare la fatturazione (pochi centesimi al mese) e Google non li usa più.'),
+  el('p',{},el('b',{},'Se la prova non riesce, '),'l\'app spiega il motivo e cosa fare. I casi più comuni: chiave copiata male (ricopiala), troppe richieste (aspetta qualche minuto), modello non disponibile (scegli Flash).')));
+ guide.open=!ADM.ai.key;
  g.append(opt('Gemini (lettura delle mail)','Serve per "Compiti da email". Chi può usarlo si sceglie qui sopra, con il permesso ✉️.',
-  el('div',{class:'h',style:'font-weight:600;color:var(--ink)'},ADM.ai.key?'Chiave impostata: '+ADM.ai.key:'Chiave non impostata: "Compiti da email" non funziona finché non la inserisci.'),
+  el('div',{class:'h',style:'font-weight:600;color:var(--ink)'},ADM.ai.key?'✅ Chiave impostata: '+ADM.ai.key+'. Premi "Prova il collegamento" per controllare che funzioni.':'⚠️ Chiave non impostata: "Compiti da email" non funziona finché non la inserisci. Segui i passaggi qui sotto.'),guide,
   el('div',{class:'row'},el('button',{class:'s',type:'button',onclick:async()=>{
     const k=await promptBox(ADM.ai.key?'Cambia la chiave Gemini':'Inserisci la chiave Gemini',el('div',{},el('p',{},'Si crea gratis su aistudio.google.com/apikey, entrando con l\'account libreriateam: copiala e incollala qui.'),el('p',{class:'m'},'La chiave resta nel foglio Google: non arriva sui telefoni delle colleghe.')),'','Salva chiave');
     if(k)act('ai',{key:k},'Chiave Gemini salvata')}},ADM.ai.key?'Cambia chiave':'Inserisci chiave'),
@@ -889,6 +927,7 @@ function renderOggi(m){
    fd.slice(0,40).forEach(f=>d.append(el('div',{class:'nv'+(f.ts>seen?' new':'')},(f.ts>seen?'● ':''),who_(f.by,20),': '+f.x,el('small',{},' · '+when(f.ts)))));
    if(nw)d.append(el('button',{class:'x',type:'button',onclick:()=>{seenTs=Date.now();try{localStorage.setItem('seen',String(seenTs))}catch(e){}savePriv();render()}},'Segna come lette (restano consultabili qui)'));
    m.append(d)}}
+ if(D===t&&teamAuth.perms().includes('admin')&&scriptOld())m.append(el('div',{class:'card',style:'border-left:6px solid var(--warn-line)'},el('div',{class:'b'},el('div',{class:'t'},'Aggiornamento dello script disponibile'),el('div',{class:'m'},'Si installa da Impostazioni → Amministrazione, con un tocco.')),el('button',{class:'s',type:'button',onclick:()=>go('impostazioni')},'Vai')));
  if(D===t)lateBox(m);
  
  const td=T.filter(i=>!late(i)&&now(i)),und=td.filter(i=>!isDone(i)),dn=td.filter(isDone);

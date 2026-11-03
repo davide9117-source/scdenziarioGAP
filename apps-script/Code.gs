@@ -1,13 +1,21 @@
 /**
  * Libreria · Team — backend su Google Sheets.
  *
- * Da incollare nell'editor Apps Script del foglio Google (Estensioni → Apps Script).
- * Poi: esegui una volta `setup`, quindi Distribuisci → Nuova distribuzione → App web
- * (Esegui come: Me · Chi ha accesso: Chiunque). Vedi README.md.
+ * Da incollare nell'editor Apps Script del foglio Google (Estensioni → Apps Script),
+ * insieme ad appsscript.json. Poi: esegui una volta `setup`, quindi Distribuisci → Nuova
+ * distribuzione → App web (Esegui come: Me · Chi ha accesso: Chiunque). Vedi README.md.
+ *
+ * Dopo la prima installazione non serve più incollarlo: dall'app (Impostazioni →
+ * Amministrazione → Script del foglio) lo script scarica da GitHub la versione nuova
+ * e si aggiorna da solo.
  *
  * Ogni sezione dell'app è una scheda del foglio (Compiti, Turni, Eventi, …): una riga
  * per voce, una colonna per campo. Le celle si possono modificare anche a mano.
  */
+
+// Da aumentare a ogni modifica di questo file: l'app la confronta per proporre l'aggiornamento.
+const SCRIPT_VERSION = '2026-11-03';
+const CODE_URL = 'https://raw.githubusercontent.com/davide9117-source/scdenziarioGAP/main/apps-script/Code.gs';
 
 const SHEET_OF = { task: 'Compiti', shift: 'Turni', event: 'Eventi', note: 'Note', client: 'Clienti', book: 'Letture', staff: 'Team' };
 const OTHER = 'Altro';
@@ -154,8 +162,8 @@ function handle_(req) {
   if (u.mustChange) fail_('Devi prima cambiare la password', 'MUST_CHANGE');
   if (a === 'list') {
     const ver = version_();
-    if (req.ver && String(req.ver) === ver) return { ok: true, same: true, ver: ver, perms: u.perms, mver: manualCur_() };
-    return withLock_(() => ({ ok: true, ver: version_(), perms: u.perms, mver: manualCur_(), ...loadAll_(SpreadsheetApp.getActive()).dump() }));
+    if (req.ver && String(req.ver) === ver) return { ok: true, same: true, ver: ver, perms: u.perms, mver: manualCur_(), sv: SCRIPT_VERSION };
+    return withLock_(() => ({ ok: true, ver: version_(), perms: u.perms, mver: manualCur_(), sv: SCRIPT_VERSION, ...loadAll_(SpreadsheetApp.getActive()).dump() }));
   }
   if (a === 'write') return withLock_(() => write_(req.ops || []));
   if (a === 'ai') return ai_(u, req);
@@ -163,7 +171,7 @@ function handle_(req) {
   if (a === 'manual_put') return withLock_(() => manualPut_(u, req.html));
   if (a === 'manual_versions') { needPerm_(u, 'manuale'); return { ok: true, cur: manualCur_(), list: manualList_().map(x => ({ vid: x.vid, label: x.label, by: x.by, at: x.at, len: x.len })) }; }
   if (a === 'manual_restore') return withLock_(() => manualRestore_(u, req.vid));
-  if (a.indexOf('admin_') === 0) { needPerm_(u, 'admin'); return a === 'admin_ai_test' ? admin_(u, a, req) : withLock_(() => admin_(u, a, req)); }
+  if (a.indexOf('admin_') === 0) { needPerm_(u, 'admin'); return a === 'admin_ai_test' || a === 'admin_script_check' ? admin_(u, a, req) : withLock_(() => admin_(u, a, req)); }
   fail_('Azione sconosciuta', 'BAD_ACTION');
 }
 
@@ -579,6 +587,54 @@ function gemini_(key, model, parts) {
   catch (x) { fail_('La risposta di Gemini non è leggibile, riprova', 'AI_BAD'); }
 }
 
+/* ───────────── Aggiornamento automatico dello script ─────────────
+   Scarica Code.gs da GitHub, lo mette al posto di questo file, crea una nuova versione e
+   la assegna alla distribuzione usata dall'app (l'indirizzo /exec resta lo stesso).
+   Serve l'API Apps Script attiva (script.google.com/home/usersettings) e i permessi
+   elencati in appsscript.json. */
+
+function latestCode_() {
+  const r = UrlFetchApp.fetch(CODE_URL + '?t=' + Date.now(), { muteHttpExceptions: true });
+  if (r.getResponseCode() !== 200) fail_('Non riesco a scaricare lo script nuovo da GitHub (' + r.getResponseCode() + ')', 'NO_CODE_SOURCE');
+  const src = r.getContentText();
+  const m = src.match(/SCRIPT_VERSION\s*=\s*'([^']+)'/);
+  if (!m || src.indexOf('function doPost(') < 0 || src.indexOf('function selfUpdate_(') < 0 || src.length > 1000000) fail_('Il file scaricato da GitHub non sembra lo script dell\'app: non lo installo', 'BAD_SOURCE');
+  return { source: src, version: m[1] };
+}
+
+function scriptApi_(method, path, body) {
+  const params = { method: method, muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() } };
+  if (body) { params.contentType = 'application/json'; params.payload = JSON.stringify(body); }
+  const r = UrlFetchApp.fetch('https://script.googleapis.com/v1/projects/' + ScriptApp.getScriptId() + path, params);
+  const code = r.getResponseCode(), text = r.getContentText();
+  if (code >= 200 && code < 300) return text ? JSON.parse(text) : {};
+  let msg = text.slice(0, 300);
+  try { msg = JSON.parse(text).error.message; } catch (x) { }
+  if (/Apps Script API/i.test(msg) && /enable|attiva/i.test(msg)) fail_('Va attivata l\'API Apps Script: apri script.google.com/home/usersettings con l\'account libreriateam e metti "API Google Apps Script" su Attiva, poi riprova', 'API_OFF');
+  if (/insufficient.*scope|scope/i.test(msg)) fail_('Allo script mancano i permessi per aggiornarsi: controlla che appsscript.json sia quello del README e riesegui "setup" per autorizzarlo (' + msg + ')', 'SCOPES');
+  fail_('Google ha risposto con un errore (' + code + '): ' + msg, 'SCRIPT_API');
+}
+
+function selfUpdate_(deployment) {
+  const src = latestCode_();
+  if (src.version === SCRIPT_VERSION) return { ok: true, same: true, version: SCRIPT_VERSION };
+  // 1. Sostituisco il codice (lascio com'è il resto del progetto, manifest compreso).
+  const content = scriptApi_('get', '/content');
+  const files = content.files || [];
+  const target = files.find(f => f.type === 'SERVER_JS' && /function doPost\(/.test(f.source || '')) || files.find(f => f.type === 'SERVER_JS');
+  if (!target) fail_('Non trovo il file dello script nel progetto', 'NO_TARGET');
+  target.source = src.source;
+  scriptApi_('put', '/content', { scriptId: ScriptApp.getScriptId(), files: files.map(f => ({ name: f.name, type: f.type, source: f.source })) });
+  // 2. Nuova versione e 3. la assegno alla distribuzione dell'app.
+  const v = scriptApi_('post', '/versions', { description: 'App libreria ' + src.version });
+  const deps = (scriptApi_('get', '/deployments').deployments || []).filter(d => d.deploymentConfig && d.deploymentConfig.versionNumber);
+  const dep = deps.find(d => d.deploymentId === deployment) ||
+    (deps.length === 1 ? deps[0] : null);
+  if (!dep) fail_('Codice aggiornato, ma non trovo la distribuzione dell\'app: in Apps Script fai Distribuisci → Gestisci distribuzioni → ✎ → Nuova versione', 'NO_DEPLOYMENT');
+  scriptApi_('put', '/deployments/' + dep.deploymentId, { deploymentConfig: { scriptId: ScriptApp.getScriptId(), versionNumber: v.versionNumber, manifestFileName: 'appsscript', description: 'App libreria ' + src.version } });
+  return { ok: true, from: SCRIPT_VERSION, to: src.version };
+}
+
 /* ───────────── Amministrazione (dall'app, solo con il permesso "admin") ───────────── */
 
 function mask_(k) {
@@ -591,7 +647,8 @@ function admin_(u, a, req) {
     ok: true,
     code: teamCode_(),
     ai: { key: mask_(confValue_(AI_KEY_LABEL)), model: aiModel_(), defaultModel: AI_DEFAULT_MODEL },
-    users: U.list.map(x => ({ nome: x.nome, perms: x.perms, mustChange: x.mustChange, last: x.last }))
+    users: U.list.map(x => ({ nome: x.nome, perms: x.perms, mustChange: x.mustChange, last: x.last })),
+    sv: SCRIPT_VERSION
   });
   if (a === 'admin_get') return state();
   if (a === 'admin_perms') {
@@ -642,6 +699,11 @@ function admin_(u, a, req) {
     gemini_(key, model, [{ text: 'Rispondi solo con questo JSON: {"ok": true}' }]);
     return { ok: true, model: model, ms: Date.now() - t0 };
   }
+  if (a === 'admin_script_check') {
+    const src = latestCode_();
+    return { ok: true, current: SCRIPT_VERSION, latest: src.version };
+  }
+  if (a === 'admin_script_update') return selfUpdate_(req.deployment);
   fail_('Azione sconosciuta', 'BAD_ACTION');
 }
 
