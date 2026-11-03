@@ -6,14 +6,60 @@
 <title>Libreria – Team</title>
 <meta name="theme-color" content="#0B2759">
 <!--
-GUIDA AL CODICE - Libreria · Team (lo scadenziario)
-Un solo file: stile, struttura e logica. Si scarica e si pubblica dall'app:
-Impostazioni → App (scadenziario) → "Scarica l'app" / "Pubblica una nuova versione".
+ISTRUZIONI PER CLAUDE: leggile prima di modificare questo file.
+(Questo è un commento: non compare nell'app, lo vede solo chi apre il file.)
 
-COME FUNZIONA
-La pagina gira dentro la "cornice" dell'app (index.html su GitHub, che non si modifica).
-La cornice si occupa di: accesso con nome e password, salvataggio dei dati nel foglio Google,
-Know How, aggiornamenti. Questa pagina riceve tutto tramite due oggetti (vedi BRIDGE qui sotto):
+CHI TI SCRIVE E COSA SUCCEDE DOPO
+Questo file è la pagina dell'app "Libreria · Team", usata ogni giorno dal team di una libreria
+per compiti, turni, promo, note e Know How. La persona con cui parli (di solito Elisa) ti chiede
+delle modifiche, poi pubblica lei stessa il file nuovo dall'app per tutte le colleghe.
+Parla in italiano semplice: non è una programmatrice.
+
+COSA PUOI CAMBIARE QUI
+Tutto quello che si vede e si usa nella pagina: schermate, testi, pulsanti, colori, ordine delle
+sezioni, campi nuovi nei moduli, calcoli e filtri sui dati che l'app ha già.
+
+COSA NON SI PUÒ FARE SOLO DA QUI
+Questa pagina gira dentro una "cornice" (index.html e backend.js, su GitHub) che, insieme allo
+script del foglio Google, si occupa di: accesso e password, salvataggio dei dati nel foglio,
+permessi, Know How, Gemini (lettura delle mail), aggiornamenti. Questi pezzi NON si modificano
+da qui e Elisa non può modificarli. Servono modifiche lì, per esempio, se la richiesta prevede:
+  - funzioni nuove della cornice (teamAuth.qualcosa che non esiste) o claude.use('...') nuovi;
+  - dati salvati in un posto o in un modo diverso da db.doc('items/…'), o dati da altri fogli/file;
+  - mandare email, messaggi o notifiche a telefono chiuso; collegarsi ad altri siti o servizi;
+  - nuovi permessi, cambiare l'accesso, il comportamento di Gemini o del Know How.
+In questi casi:
+  1. NON inventare soluzioni che aggirano il problema e non simulare la funzione.
+  2. Dillo chiaramente a Elisa nella chat, con parole semplici: cosa si può fare subito nella
+     pagina e cosa invece richiede una modifica alla cornice o allo script.
+  3. Scrivi un messaggio pronto da copiare, che Elisa passerà a chi segue il codice, con titolo
+     "RICHIESTA PER CHI SEGUE IL CODICE" e dentro: cosa vuole ottenere Elisa; perché non si può
+     fare solo nella pagina; cosa servirebbe nella cornice o nello script (nomi delle funzioni e
+     dei dati, se li sai indicare); la versione della pagina (APP_VERSION).
+  4. Nella pagina fai solo la parte che funziona già oggi. Se aggiungi un pulsante che dipende
+     dalla modifica richiesta, nascondilo finché la funzione non esiste
+     (esempio: if (typeof teamAuth.nuovaFunzione === 'function') { … }).
+L'app, quando Elisa pubblica, blocca le pagine che usano funzioni della cornice che non esistono.
+
+ALLA FINE DI OGNI RISPOSTA CON UN FILE NUOVO
+  - Elenca in breve cosa hai cambiato.
+  - Ricorda a Elisa: scaricare il file, poi Impostazioni → App (scadenziario) → Pubblica una
+    nuova versione, e provarla prima con "Prova solo qui".
+
+REGOLE TECNICHE
+1. Deve restare UN SOLO file HTML che funziona da solo (a parte i caratteri di Google Fonts).
+2. A ogni modifica aumenta APP_VERSION (all'inizio dello script), per esempio "2026-11-20-a":
+   senza una versione nuova l'app non accetta il file.
+3. Lascia questo commento all'inizio del file, così com'è.
+4. Non togliere né cambiare il BRIDGE, i nomi claude.use(...) e le funzioni di teamAuth usate.
+5. Non cambiare il formato dei dati già salvati (nomi dei campi delle voci): sono nel foglio
+   Google e li usano tutte. Si possono aggiungere campi nuovi.
+6. Colori: variabili CSS in :root, uguali a quelle del Know How; il motore è applyTheme().
+7. Provata in Claude come artifact, la pagina parte con dati di prova vuoti e senza accesso:
+   è normale.
+
+COME FUNZIONA (per orientarti nel codice)
+Questa pagina riceve dalla cornice due oggetti (vedi BRIDGE qui sotto):
   claude.use('db')        i dati: db.doc('items/<id>').get/set/update/delete,
                           db.collection('items').onSnapshot(cb) per ricevere l'elenco aggiornato
   claude.use('user')      chi è entrata;  claude.use('downloads') per scaricare file;
@@ -21,16 +67,6 @@ Know How, aggiornamenti. Questa pagina riceve tutto tramite due oggetti (vedi BR
   teamAuth                permessi, password, Know How, amministrazione (funzioni della cornice)
 Ogni voce dei dati ha un campo "kind": task (compito), shift (turno), event (evento o promo),
 note, client (cliente/ordine), book (lettura), staff (persona del team).
-
-REGOLE PER MODIFICARLA (anche per Claude)
-1. Deve restare UN SOLO file HTML che funziona da solo (a parte i caratteri di Google Fonts).
-2. A ogni modifica aumenta APP_VERSION (all'inizio dello script), per esempio "2026-11-20-a":
-   senza una versione nuova l'app non accetta il file.
-3. Non togliere né cambiare il BRIDGE, i nomi claude.use(...) e le funzioni di teamAuth usate.
-4. Non cambiare il formato dei dati già salvati (nomi dei campi delle voci): sono nel foglio Google
-   e li usano tutte. Si possono aggiungere campi nuovi.
-5. Colori: variabili CSS in :root, uguali a quelle del Know How; il motore dei colori è applyTheme().
-6. Provata in Claude come artifact la pagina parte con dati di prova vuoti e senza accesso: è normale.
 
 STRUTTURA DELLO SCRIPT (nell'ordine)
   APP_VERSION, costanti e utilità (el, date, ricorrenze dei compiti: occ, pk, dueOn)
@@ -877,16 +913,33 @@ async function appUpload(f){
  if(!/<(script|body|html)\b/i.test(html)){await dialog({title:'Non è una pagina',body:'"'+f.name+'" non è un file HTML. Serve il file .html dell\'app scaricato da Claude.'});return}
  if(/DATA_VERSION\s*=/.test(html)&&/var BASE\s*=/.test(html)){await dialog({title:'Questo è il Know How',body:'Il file "'+f.name+'" è il manuale: si carica nella sezione Know How, qui sopra.'});return}
  const m=html.match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/),ver=m?m[1]:'';
+ // Funzioni della cornice che la pagina nuova usa ma che non esistono ancora: servono modifiche alla cornice o allo script.
+ const CAPS=['db','user','downloads','sample'];
+ const code_=html.replace(/<!--[\s\S]*?-->/g,'');
+ const needT=[...new Set([...code_.matchAll(/\bteamAuth\.([A-Za-z_$][\w$]*)/g)].map(x=>x[1]))].filter(k=>!(k in teamAuth));
+ const needC=[...new Set([...code_.matchAll(/claude\.use\(\s*['"]([\w-]+)['"]/g)].map(x=>x[1]))].filter(c=>!CAPS.includes(c));
+ if(needT.length||needC.length){
+  const list=[...needT.map(k=>'teamAuth.'+k),...needC.map(c=>"claude.use('"+c+"')")];
+  const msg='RICHIESTA PER CHI SEGUE IL CODICE\nApp Libreria · Team, nuova versione della pagina: '+(ver||'senza numero')+' (file "'+f.name+'").\nLa pagina usa funzioni che la cornice o lo script non hanno ancora:\n- '+list.join('\n- ')+'\nCosa volevo ottenere: (scrivilo qui)\nAllego il file della pagina nuova.';
+  const ta=el('textarea',{rows:7,readonly:''},msg);
+  await dialog({title:'Serve una modifica alla cornice o allo script',body:[el('p',{},'Questa versione usa funzioni che l\'app non ha ancora, quindi non la pubblico: si bloccherebbe.'),el('ul',{},...list.map(x=>el('li',{},x))),
+   el('p',{},'Copia il messaggio qui sotto (aggiungi cosa volevi ottenere) e mandalo, con il file, a chi segue il codice. Oppure chiedi a Claude di fare solo la parte che funziona già.'),ta],
+   buttons:[{label:'Chiudi',value:false},{label:'Copia il messaggio',value:true,cls:'p',keep:true,onclick:()=>{ta.select();try{navigator.clipboard.writeText(msg).then(()=>toast('Messaggio copiato'),()=>document.execCommand('copy'))}catch(e){document.execCommand('copy')}}}],cancelValue:false});
+  return}
+ // Se Claude ha tolto le istruzioni all'inizio del file, le rimetto io (servono alla prossima modifica).
+ let fixed=html,readd=false;
+ if(!/ISTRUZIONI PER CLAUDE/.test(html)){const c=[...document.head.childNodes].find(n=>n.nodeType===8&&/ISTRUZIONI PER CLAUDE/.test(n.data));
+  if(c){fixed=/<head[^>]*>/i.test(html)?html.replace(/<head[^>]*>/i,x=>x+'\n<!--'+c.data+'-->'):'<!--'+c.data+'-->\n'+html;readd=true}}
  if(!ver){await dialog({title:'Manca il numero di versione',body:'Nel file non trovo APP_VERSION. Chiedi a Claude di lasciare la riga "const APP_VERSION=…" all\'inizio dello script e di aumentarla.'});return}
  const inf=S.info(),cur=inf.mode==='custom'&&inf.info?inf.info.label:APP_VERSION;
  if(ver===cur||ver===APP_VERSION&&inf.mode!=='preview'){await dialog({title:'Manca il nuovo numero di versione',body:['Nel file la versione è ancora '+ver+', la stessa di quella in uso.','Chiedi a Claude di aumentare APP_VERSION (per esempio '+ver+'-b), poi riprova con il file nuovo.']});return}
  let wait;dialog({title:'Controllo il file…',body:[el('p',{},'Provo ad aprire l\'app nuova con i dati veri, senza modificarli.'),el('div',{class:'prog'},el('i',{style:'width:60%'}))],buttons:[],locked:true,onopen:d=>wait=d});
- const r=await S.trial(html);if(wait){wait.close();wait.remove()}
+ const r=await S.trial(fixed);if(wait){wait.close();wait.remove()}
  if(!r.ok){await dialog({title:'Il file non funziona',body:[r.errs.length?'Ho provato ad aprirlo e si blocca con questo errore:':!r.usedDb?'La pagina non usa i dati dell\'app (manca claude.use(\'db\')): non sembra lo scadenziario.':'Ho provato ad aprirlo e resta vuoto.',r.errs.length?el('ul',{},...r.errs.map(x=>el('li',{},x))):null,'Non lo pubblico: chiedi a Claude di correggerlo, poi riprova con il file nuovo.']});return}
- const how=await dialog({title:'Versione '+ver+' pronta',body:[el('p',{},'Il file funziona. Come vuoi procedere?'),el('ul',{},el('li',{},el('b',{},'Prova solo qui: '),'l\'app si riapre con la versione nuova solo su questo telefono, con i dati veri. Poi la pubblichi o torni indietro.'),el('li',{},el('b',{},'Pubblica per tutte: '),'la vedranno tutte alla prossima apertura. La versione attuale resta tra le precedenti.'))],
+ const how=await dialog({title:'Versione '+ver+' pronta',body:[el('p',{},'Il file funziona. Come vuoi procedere?'),readd?el('p',{class:'m'},'Nel file mancavano le istruzioni per Claude all\'inizio: le ho rimesse io.'):null,el('ul',{},el('li',{},el('b',{},'Prova solo qui: '),'l\'app si riapre con la versione nuova solo su questo telefono, con i dati veri. Poi la pubblichi o torni indietro.'),el('li',{},el('b',{},'Pubblica per tutte: '),'la vedranno tutte alla prossima apertura. La versione attuale resta tra le precedenti.'))],
   buttons:[{label:'Annulla',value:null},{label:'Prova solo qui',value:'preview'},{label:'Pubblica per tutte',value:'publish',cls:'p'}],cancelValue:null});
- if(how==='preview'){await S.preview(html);return}
- if(how==='publish')appPublish(html)}
+ if(how==='preview'){await S.preview(fixed);return}
+ if(how==='publish')appPublish(fixed)}
 async function appPublish(html){
  const S=window.appShell;let pd;dialog({title:'Pubblico…',body:[el('p',{},'Salvo l\'app nel foglio Google, non chiudere.'),el('div',{class:'prog'},el('i',{style:'width:80%'}))],buttons:[],locked:true,onopen:d=>pd=d});
  try{const info=await S.publish(html);if(pd){pd.close();pd.remove()}await dialog({title:'App pubblicata',body:'Versione '+(info.label||'')+' online: le colleghe la vedranno alla prossima apertura. Ora l\'app si ricarica.'});S.reload()}
