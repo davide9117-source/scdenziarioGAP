@@ -14,7 +14,7 @@
  */
 
 // Da aumentare a ogni modifica di questo file: l'app la confronta per proporre l'aggiornamento.
-const SCRIPT_VERSION = '2026-11-03b';
+const SCRIPT_VERSION = '2026-11-03c';
 const CODE_URL = 'https://raw.githubusercontent.com/davide9117-source/scdenziarioGAP/main/apps-script/Code.gs';
 
 const SHEET_OF = { task: 'Compiti', shift: 'Turni', event: 'Eventi', note: 'Note', client: 'Clienti', book: 'Letture', staff: 'Team' };
@@ -669,6 +669,15 @@ function admin_(u, a, req) {
       fail_('Deve restare almeno una persona con il permesso di amministrare', 'LAST_ADMIN');
     U.sheet.getRange(t.row, 7).setValue(perms.join(' '));
     t.perms = perms;
+    return state();
+  }
+  if (a === 'admin_delete') {
+    const t = findUser_(U, req.nome);
+    if (!t) fail_('Persona non trovata', 'NOT_FOUND');
+    if (t.nome === u.nome) fail_('Non puoi eliminare il tuo stesso accesso', 'SELF');
+    // Tolgo la riga dalla scheda Utenti: la persona esce da tutti i dispositivi e la sua password non vale più.
+    U.sheet.deleteRow(t.row);
+    U.list = U.list.filter(x => x !== t);
     return state();
   }
   if (a === 'admin_reset') {

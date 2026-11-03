@@ -102,6 +102,7 @@ Chi ha il permesso **amministrazione** trova in Impostazioni la sezione **Ammini
 - il **codice squadra** (vederlo, copiarlo, cambiarlo);
 - i **permessi** di ogni persona: ✉️ Compiti da email, 📘 Pubblica il Know How, 🛠️ Modifica l'app, ⚙️ Amministrazione (deve sempre restarne almeno una);
 - **Azzera password**: la persona esce da tutti i dispositivi e rientra con il codice squadra;
+- **Elimina accesso**: toglie l'utente (la persona esce da tutti i dispositivi e non può più entrare); quello che ha inserito resta. Per impedirle di crearsi un nuovo accesso, cambia anche il codice squadra (l'app lo propone subito);
 - **Gemini**: chiave, modello, prova del collegamento.
 
 Il primo permesso di amministrazione si dà una volta sola dal foglio: scheda **Utenti**, colonna **permessi**, scrivi `admin` nella riga della persona (più permessi separati da uno spazio, es. `admin email manuale`). Da lì in poi si fa tutto dall'app.

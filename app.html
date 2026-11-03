@@ -958,7 +958,7 @@ async function appVersions(){
    Il server ricontrolla il permesso a ogni richiesta. */
 let ADM=null,admBusy=false;
 // Versione dello script Google pensata per questa versione dell'app (apps-script/Code.gs, SCRIPT_VERSION).
-const NEED_SCRIPT='2026-11-03b';
+const NEED_SCRIPT='2026-11-03c';
 const scriptOld=()=>{const v=teamAuth.scriptVer();return !v||v<NEED_SCRIPT};
 // Spiega in parole semplici gli errori di Gemini.
 function geminiHelp(msg){msg=String(msg||'');
@@ -1000,7 +1000,13 @@ function adminSettings(grp,opt){
    if(on&&k==='admin'&&x.nome===uid&&!await confirmBox('Togliti l\'amministrazione?','Non vedrai più questa sezione. Potrà ridartela solo un\'altra persona con il permesso di amministrare.','Togli',true))return;
    act('perms',{nome:x.nome,perms:on?x.perms.filter(p=>p!==k):[...x.perms,k]},(on?'Tolto a ':'Dato a ')+x.nome+': '+l.replace(/^\S+\s/,''))}},l))});
   row.append(chips);
-  if(x.nome!==uid)row.append(el('button',{class:'s d',type:'button',onclick:async()=>{if(await confirmBox('Azzerare la password di '+x.nome+'?',['Esce subito da tutti i suoi dispositivi.','Per rientrare userà il codice squadra ('+ADM.code+') e sceglierà una password nuova.'],'Azzera password',true))act('reset',{nome:x.nome},'Password di '+x.nome+' azzerata')}},'Azzera password'));
+  if(x.nome!==uid)row.append(el('div',{class:'row',style:'flex:1 1 100%'},el('button',{class:'s d',type:'button',onclick:async()=>{if(await confirmBox('Azzerare la password di '+x.nome+'?',['Esce subito da tutti i suoi dispositivi.','Per rientrare userà il codice squadra ('+ADM.code+') e sceglierà una password nuova.'],'Azzera password',true))act('reset',{nome:x.nome},'Password di '+x.nome+' azzerata')}},'Azzera password'),
+   el('button',{class:'s d',type:'button',onclick:async()=>{
+    if(!await confirmBox('Eliminare l\'accesso di '+x.nome+'?',['Esce subito da tutti i suoi dispositivi e non può più entrare con la sua password. Non si può annullare.','Le cose che ha inserito (compiti, turni, note…) restano; il suo nome resta anche nell\'elenco del Team, da cui puoi toglierlo a parte.','Se conosce il codice squadra potrebbe crearsi un nuovo accesso: per impedirlo cambia anche il codice squadra.'],'Elimina accesso',true))return;
+    try{ADM=await teamAuth.admin('delete',{nome:x.nome})}catch(e){await dialog({title:'Non riuscito',body:String(e&&e.message||e)});render();return}
+    const ch=await dialog({title:'Accesso eliminato',body:x.nome+' non può più entrare con la sua password. Vuoi cambiare anche il codice squadra, così non può crearsi un nuovo accesso?',buttons:[{label:'Non ora',value:false},{label:'Cambia codice squadra',value:true,cls:'p'}],cancelValue:false});
+    if(ch){const c=await promptBox('Nuovo codice squadra','Da 4 a 30 caratteri, senza spazi. Le colleghe già entrate non devono fare niente.','','Cambia codice');if(c){await act('code',{code:c},'Codice squadra cambiato');return}}
+    render()}},'Elimina accesso')));
   pw.append(row)});
  g.append(pw);
  // Gemini
