@@ -960,8 +960,12 @@ let ADM=null,admBusy=false;
 // Versione dello script Google pensata per questa versione dell'app (apps-script/Code.gs, SCRIPT_VERSION).
 const NEED_SCRIPT='2026-11-03c';
 const scriptOld=()=>{const v=teamAuth.scriptVer();return !v||v<NEED_SCRIPT};
+// Lo script non ha ancora ricevuto da Google i permessi necessari (manca l'autorizzazione con "setup").
+const AUTH_HELP='Google non ha ancora dato allo script tutti i permessi. Dal computer, con l\'account libreriateam: apri il foglio dell\'app → Estensioni → Apps Script → nel menu delle funzioni scegli "setup" → Esegui → Rivedi autorizzazioni → scegli libreriateam → Avanzate → Vai a … → spunta tutte le caselle → Consenti. Poi riprova da qui.';
+const authErr=m=>/autorizzazione necessaria|Autorizzazioni obbligatorie|permission to call|required permissions|script\.external_request|auth\/script\./i.test(String(m||''));
 // Spiega in parole semplici gli errori di Gemini.
 function geminiHelp(msg){msg=String(msg||'');
+ if(authErr(msg))return AUTH_HELP;
  if(/API key not valid|API_KEY_INVALID|invalid api key/i.test(msg))return 'La chiave non è valida. Ricopiala per intero da aistudio.google.com/apikey (senza spazi prima o dopo) e reinseriscila in Impostazioni → Amministrazione → Gemini.';
  if(/429|RESOURCE_EXHAUSTED|quota|rate limit/i.test(msg))return 'Gemini ha ricevuto troppe richieste o è finito il limite gratuito di oggi. Riprova tra qualche minuto (o domani); se succede spesso, scegli il modello Flash Lite.';
  if(/404|not found|NOT_FOUND/i.test(msg))return 'Il modello scelto non è disponibile. In Impostazioni → Amministrazione → Gemini scegli "Flash".';
@@ -978,12 +982,12 @@ function adminSettings(grp,opt){
  // Script del foglio Google: si aggiorna da solo, senza incollare niente
  const sv=ADM.sv||teamAuth.scriptVer(),old=!sv||sv<NEED_SCRIPT;
  const upd=el('button',{class:old?'p':'s',type:'button',onclick:async()=>{
-  if(!old){upd.disabled=true;upd.textContent='Controllo…';try{const r=await teamAuth.admin('script_check');if(r.latest===r.current){await dialog({title:'Script aggiornato',body:'Lo script del foglio è già all\'ultima versione ('+r.current+').'});upd.disabled=false;upd.textContent='Controlla aggiornamenti';return}}catch(e){await dialog({title:'Controllo non riuscito',body:String(e&&e.message||e)});upd.disabled=false;upd.textContent='Controlla aggiornamenti';return}}
+  if(!old){upd.disabled=true;upd.textContent='Controllo…';try{const r=await teamAuth.admin('script_check');if(r.latest===r.current){await dialog({title:'Script aggiornato',body:'Lo script del foglio è già all\'ultima versione ('+r.current+').'});upd.disabled=false;upd.textContent='Controlla aggiornamenti';return}}catch(e){const m=String(e&&e.message||e);await dialog({title:'Controllo non riuscito',body:authErr(m)?[AUTH_HELP,el('p',{class:'m'},'Dettaglio: '+m)]:m});upd.disabled=false;upd.textContent='Controlla aggiornamenti';return}}
   if(!await confirmBox('Aggiornare lo script del foglio?',['Lo script scarica la versione nuova da GitHub e la installa da solo. Ci vuole meno di un minuto e l\'app resta utilizzabile.','Se qualcosa non va, l\'app ti dice cosa fare: la versione attuale continua a funzionare.'],'Aggiorna'))return;
   let pd;dialog({title:'Aggiorno lo script…',body:[el('p',{},'Non chiudere l\'app.'),el('div',{class:'prog'},el('i',{style:'width:70%'}))],buttons:[],locked:true,onopen:d=>pd=d});
   try{const r=await teamAuth.admin('script_update',{deployment:teamAuth.deploymentId()});if(pd){pd.close();pd.remove()}
    await dialog({title:r.same?'Script già aggiornato':'Script aggiornato',body:r.same?'Era già all\'ultima versione.':'Installata la versione '+r.to+'. Da ora le funzioni nuove sono attive per tutte.'});ADM=null;teamAuth.refresh();render()}
-  catch(e){if(pd){pd.close();pd.remove()}await dialog({title:'Aggiornamento non riuscito',body:[String(e&&e.message||e),el('p',{class:'m'},'Lo script di prima continua a funzionare. Se il messaggio non è chiaro, mandalo a chi segue l\'app.')]})}}},old?'Aggiorna lo script':'Controlla aggiornamenti');
+  catch(e){if(pd){pd.close();pd.remove()}const m=String(e&&e.message||e);await dialog({title:'Aggiornamento non riuscito',body:authErr(m)?[AUTH_HELP,el('p',{class:'m'},'Lo script di prima continua a funzionare. Dettaglio: '+m)]:[m,el('p',{class:'m'},'Lo script di prima continua a funzionare. Se il messaggio non è chiaro, mandalo a chi segue l\'app.')]})}}},old?'Aggiorna lo script':'Controlla aggiornamenti');
  g.append(opt('Script del foglio Google',old?'C\'è una versione nuova dello script (quella installata è '+(sv||'precedente a novembre')+'). Si installa da qui, senza aprire Google.':'Aggiornato (versione '+sv+'). Quando ce n\'è una nuova, qui compare il pulsante per installarla.',el('div',{class:'row'},upd)));
  // Codice squadra
  g.append(opt('Codice squadra','Serve per il primo accesso di ogni collega e a chi ha la password azzerata.',
