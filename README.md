@@ -70,6 +70,24 @@ Restano le ultime **3 versioni**: da *Vedi le versioni* si può tornare a una pr
 
 Per Elisa, quando lavora con Claude: il file deve restare **un'unica pagina HTML** che funziona da sola, e a ogni modifica dei contenuti va aumentato `DATA_VERSION`.
 
+## Modificare l'app (scadenziario)
+
+L'app è divisa in due parti:
+- **la cornice** (`index.html` + `backend.js` su GitHub): accesso, salvataggio nel foglio, Know How, aggiornamenti. Non si tocca dall'app;
+- **la pagina dell'app** (`app.html`): schermate, pulsanti, grafica. È questa che si può modificare.
+
+Chi ha il permesso 🛠️ **Modifica l'app** trova in Impostazioni → **App (scadenziario)**:
+1. **Scarica l'app**: il file `.html` della versione in uso, con all'inizio le istruzioni per Claude (cosa non toccare, come aumentare `APP_VERSION`).
+2. Lo dà a Claude, chiede le modifiche e scarica il file nuovo.
+3. **Pubblica una nuova versione**: trascina il file. L'app controlla che `APP_VERSION` sia cambiata e prova la pagina con i dati veri senza modificarli; se si blocca o resta vuota non la accetta.
+4. Sceglie **Prova solo qui** (anteprima solo sul proprio telefono, con una barra in alto per *Pubblicare* o *Uscire*) oppure **Pubblica per tutte**.
+
+Restano le ultime 3 versioni (*Vedi le versioni*) e c'è **Torna all'originale** (la pagina `app.html` di GitHub). Se una versione pubblicata non parte su un telefono, la cornice torna da sola all'originale e lo segnala. Indirizzo di emergenza: aggiungi `?originale` all'indirizzo dell'app.
+
+Il Know How è una parte separata, con i suoi pulsanti (*Scarica il manuale* / *Pubblica una nuova versione*) nella sezione Know How.
+
+Se una modifica all'app richiede anche funzioni nuove nello script Google, quella parte va fatta da chi segue il codice su GitHub.
+
 ## Compiti da email (IA Gemini)
 
 Chi ha il permesso trova in **Compiti** il pulsante **✉️ Da email**: incolla il testo di una mail (o allega uno screenshot), l'IA propone i compiti con date e note, e lei li controlla prima di crearli.
@@ -82,7 +100,7 @@ La chiave resta nel foglio (scheda Impostazioni): non arriva mai sui telefoni n�
 
 Chi ha il permesso **amministrazione** trova in Impostazioni la sezione **Amministrazione**, da cui gestisce senza aprire il foglio:
 - il **codice squadra** (vederlo, copiarlo, cambiarlo);
-- i **permessi** di ogni persona: ✉️ Compiti da email, 📘 Pubblica il Know How, ⚙️ Amministrazione (deve sempre restarne almeno una);
+- i **permessi** di ogni persona: ✉️ Compiti da email, 📘 Pubblica il Know How, 🛠️ Modifica l'app, ⚙️ Amministrazione (deve sempre restarne almeno una);
 - **Azzera password**: la persona esce da tutti i dispositivi e rientra con il codice squadra;
 - **Gemini**: chiave, modello, prova del collegamento.
 
@@ -106,7 +124,7 @@ Perché funzioni, lo script installato deve essere quello di novembre 2026 o suc
 
 Quando cambia `apps-script/Code.gs`, aumentare `SCRIPT_VERSION` nello script e `NEED_SCRIPT` in `index.html` (stesso valore): così chi amministra vede l'aggiornamento da installare.
 
-Solo file statici: `index.html` (interfaccia; lo stile e i colori ricalcano quelli del Know How), `backend.js` (accesso, sincronizzazione, cache offline, scaricamento del Know How), `sw.js` (service worker), `manifest.webmanifest`, `icons/`. Per provarla in locale basta un server statico (es. `npx http-server .`); senza HTTPS il service worker non viene registrato ma il resto funziona.
+Solo file statici: `index.html` (la cornice: accesso, scelta della versione dell'app, anteprima), `app.html` (l'interfaccia originale; stile e colori ricalcano il Know How; a ogni modifica aumentare `APP_VERSION`), `backend.js` (accesso, sincronizzazione, cache offline, Know How e app pubblicata), `sw.js` (service worker), `manifest.webmanifest`, `icons/`. Per provarla in locale basta un server statico (es. `npx http-server .`); senza HTTPS il service worker non viene registrato ma il resto funziona.
 
 ## Limiti
 

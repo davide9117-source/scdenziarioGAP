@@ -15,11 +15,12 @@
   const apiUrl = () => (ls.get('apiUrl') || (window.APP_CONFIG && window.APP_CONFIG.apiUrl) || '').trim();
 
   let token = ls.get('tk'), me = ls.get('tn') || '', perms = ls.json('tp', []);
-  let mver = ls.get('mver') || '', sver = ls.get('sv') || '';
+  let mver = ls.get('mver') || '', sver = ls.get('sv') || '', aver = ls.get('aver') || '';
   function gotPerms(j) {
     if (j && Array.isArray(j.perms)) { perms = j.perms; ls.set('tp', JSON.stringify(perms)); }
     if (j && 'mver' in j) { mver = j.mver || ''; ls.set('mver', mver); }
     if (j && j.perms) { sver = j.sv || ''; ls.set('sv', sver); }
+    if (j && 'aver' in j) { aver = j.aver || ''; ls.set('aver', aver); }
   }
 
   /* ── Know How: il file del manuale, scaricato solo dopo l'accesso e tenuto sul dispositivo ── */
@@ -59,6 +60,58 @@
     await khPut({ html, ver: j.info.vid, info: j.info }); mver = j.info.vid; ls.set('mver', mver);
     return j.info;
   }
+  /* ── App (scadenziario) pubblicata da Elisa: salvata nel foglio, copia sul dispositivo ── */
+  const APPC = 'app-file';
+  const appKey = kind => location.origin + '/__app-' + kind;
+  async function appCache(kind) {
+    try {
+      const r = await (await caches.open(APPC)).match(appKey(kind));
+      if (!r) return null;
+      return { html: await r.text(), ver: r.headers.get('x-ver') || '', info: JSON.parse(decodeURIComponent(r.headers.get('x-info') || '') || 'null') };
+    } catch (e) { return null; }
+  }
+  async function appCachePut(kind, o) {
+    try { await (await caches.open(APPC)).put(appKey(kind), new Response(o.html, { headers: { 'content-type': 'text/html; charset=utf-8', 'x-ver': o.ver || '', 'x-info': encodeURIComponent(JSON.stringify(o.info || null)) } })); } catch (e) { }
+  }
+  async function appCacheDel(kind) { try { await (await caches.open(APPC)).delete(appKey(kind)); } catch (e) { } }
+  async function getApp() {
+    await ensureLogin();
+    const c = await appCache('custom');
+    if (c && c.ver && c.ver === aver) return c;
+    try {
+      const j = await call('app_get', { ver: c ? c.ver : '' });
+      if (j.none) return { none: true };
+      if (j.same) return c;
+      const o = { html: j.html, ver: j.ver, info: j.info || null };
+      await appCachePut('custom', o);
+      return o;
+    } catch (e) { return c || { error: e.message, code: e.code }; }
+  }
+  async function putApp(html) {
+    const j = await call('app_put', { html });
+    await appCachePut('custom', { html, ver: j.info.vid, info: j.info }); aver = j.info.vid; ls.set('aver', aver);
+    return j.info;
+  }
+  async function restoreApp(vid) { await call('app_restore', { vid }); aver = vid; ls.set('aver', aver); await appCacheDel('custom'); }
+  async function clearApp() { await call('app_clear'); aver = ''; ls.set('aver', ''); }
+  // Per provare una versione nuova dell'app con i dati veri senza modificarli: le scritture non fanno niente.
+  function readOnlyClaude() {
+    const subs = []; let used = false;
+    const ro = {
+      doc(p) { const d = db.doc(p); return { id: d.id, get: d.get, set: () => Promise.resolve(), update: () => Promise.resolve(), delete: () => Promise.resolve() }; },
+      collection(n) { const q = db.collection(n); const w = { limit(k) { q.limit(k); return w; }, onSnapshot(cb, err) { const un = q.onSnapshot(cb, err); subs.push(un); return un; } }; return w; }
+    };
+    return {
+      get used() { return used; },
+      async use(name) {
+        if (name === 'db') { used = true; await ensureLogin(); return ro; }
+        if (name === 'sample') throw Object.assign(new Error('Non disponibile nella prova'), { code: 'UNAVAILABLE' });
+        return window.claude.use(name);
+      },
+      close() { subs.forEach(u => { try { u(); } catch (e) { } }); }
+    };
+  }
+
   async function restoreManual(vid) {
     await call('manual_restore', { vid });
     khMem = null; try { await caches.delete(KHC); } catch (e) { }
@@ -379,9 +432,9 @@
   };
   const user = { me: async () => ({ id: me, name: me }) };
   const downloads = {
-    async save({ filename, data }) {
+    async save({ filename, data, type }) {
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+      a.href = URL.createObjectURL(new Blob([data], { type: type || 'application/json' }));
       a.download = filename; document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     }
@@ -442,6 +495,9 @@
     admin: (action, payload) => call('admin_' + action, payload),
     scriptVer: () => sver,
     // L'indirizzo /macros/s/<id>/exec contiene l'id della distribuzione da aggiornare.
+    appVer: () => aver,
+    appCache, appCachePut, appCacheDel, getApp, putApp, restoreApp, clearApp, readOnlyClaude,
+    appVersions: () => call('app_versions'),
     deploymentId: () => ((apiUrl().match(/\/macros\/s\/([^/]+)\//) || [])[1] || ''),
     waitSync
   };

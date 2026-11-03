@@ -14,7 +14,7 @@
  */
 
 // Da aumentare a ogni modifica di questo file: l'app la confronta per proporre l'aggiornamento.
-const SCRIPT_VERSION = '2026-11-03';
+const SCRIPT_VERSION = '2026-11-03b';
 const CODE_URL = 'https://raw.githubusercontent.com/davide9117-source/scdenziarioGAP/main/apps-script/Code.gs';
 
 const SHEET_OF = { task: 'Compiti', shift: 'Turni', event: 'Eventi', note: 'Note', client: 'Clienti', book: 'Letture', staff: 'Team' };
@@ -40,9 +40,13 @@ const AI_KEY_LABEL = 'Chiave Gemini';
 const AI_MODEL_LABEL = 'Modello Gemini';
 const AI_DEFAULT_MODEL = 'gemini-flash-latest';
 // Permessi che si possono dare dalla sezione Amministrazione dell'app.
-const PERMS = ['email', 'manuale', 'admin'];
+const PERMS = ['email', 'manuale', 'app', 'admin'];
 // Know How: il file del manuale, salvato a pezzi in una scheda nascosta (una cella tiene al massimo 50.000 caratteri).
-const MANUAL = '_manuale';
+// Anche l'app (scadenziario) modificata da Elisa si salva così, in una scheda separata.
+const STORES = {
+  manual: { sheet: '_manuale', perm: 'manuale', prop: 'man', label: /DATA_VERSION\s*=\s*["']([^"']+)["']/, name: 'Know How' },
+  app: { sheet: '_app', perm: 'app', prop: 'app', label: /APP_VERSION\s*=\s*["']([^"']+)["']/, name: 'app' }
+};
 const CHUNK = 40000;
 const KEEP_VERSIONS = 3;
 const TOKEN_DAYS = 180;
@@ -162,15 +166,22 @@ function handle_(req) {
   if (u.mustChange) fail_('Devi prima cambiare la password', 'MUST_CHANGE');
   if (a === 'list') {
     const ver = version_();
-    if (req.ver && String(req.ver) === ver) return { ok: true, same: true, ver: ver, perms: u.perms, mver: manualCur_(), sv: SCRIPT_VERSION };
-    return withLock_(() => ({ ok: true, ver: version_(), perms: u.perms, mver: manualCur_(), sv: SCRIPT_VERSION, ...loadAll_(SpreadsheetApp.getActive()).dump() }));
+    const extra = { perms: u.perms, mver: storeCur_('manual'), aver: storeCur_('app'), sv: SCRIPT_VERSION };
+    if (req.ver && String(req.ver) === ver) return { ok: true, same: true, ver: ver, ...extra };
+    return withLock_(() => ({ ok: true, ver: version_(), ...extra, ...loadAll_(SpreadsheetApp.getActive()).dump() }));
   }
   if (a === 'write') return withLock_(() => write_(req.ops || []));
   if (a === 'ai') return ai_(u, req);
-  if (a === 'manual_get') return manualGet_(req);
-  if (a === 'manual_put') return withLock_(() => manualPut_(u, req.html));
-  if (a === 'manual_versions') { needPerm_(u, 'manuale'); return { ok: true, cur: manualCur_(), list: manualList_().map(x => ({ vid: x.vid, label: x.label, by: x.by, at: x.at, len: x.len })) }; }
-  if (a === 'manual_restore') return withLock_(() => manualRestore_(u, req.vid));
+  const sm = a.match(/^(manual|app)_(get|put|versions|restore|clear)$/);
+  if (sm) {
+    const k = sm[1], op = sm[2];
+    if (op === 'get') return storeGet_(k, req);
+    needPerm_(u, STORES[k].perm);
+    if (op === 'put') return withLock_(() => storePut_(k, u, req.html));
+    if (op === 'versions') return { ok: true, cur: storeCur_(k), list: storeList_(k).map(x => ({ vid: x.vid, label: x.label, by: x.by, at: x.at, len: x.len })) };
+    if (op === 'restore') return withLock_(() => storeRestore_(k, req.vid));
+    if (op === 'clear') { PropertiesService.getScriptProperties().setProperty(STORES[k].prop + '_cur', ''); return { ok: true }; }
+  }
   if (a.indexOf('admin_') === 0) { needPerm_(u, 'admin'); return a === 'admin_ai_test' || a === 'admin_script_check' ? admin_(u, a, req) : withLock_(() => admin_(u, a, req)); }
   fail_('Azione sconosciuta', 'BAD_ACTION');
 }
@@ -460,95 +471,93 @@ function write_(ops) {
   return { ok: true, results: res, base: base, ver: version_() };
 }
 
-/* ───────────── Know How (manuale) ───────────── */
+/* ───────────── Know How e app: file HTML salvati nel foglio, con le ultime versioni ───────────── */
 
 function needPerm_(u, p) {
   if (u.perms.indexOf(p) < 0) fail_('Non hai il permesso per questa funzione', 'FORBIDDEN');
 }
 
-function manualSheet_() {
-  const ss = SpreadsheetApp.getActive();
-  let sh = ss.getSheetByName(MANUAL);
+function storeSheet_(k) {
+  const ss = SpreadsheetApp.getActive(), name = STORES[k].sheet;
+  let sh = ss.getSheetByName(name);
   if (!sh) {
-    sh = ss.insertSheet(MANUAL);
+    sh = ss.insertSheet(name);
     sh.getRange(1, 1, 1, 3).setValues([['versione', 'parte', 'testo']]);
     sh.hideSheet();
   }
   return sh;
 }
 
-function manualCur_() {
-  return PropertiesService.getScriptProperties().getProperty('man_cur') || '';
+function storeCur_(k) {
+  return PropertiesService.getScriptProperties().getProperty(STORES[k].prop + '_cur') || '';
 }
 
-function manualList_() {
-  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('man_list') || '[]'); } catch (x) { return []; }
+function storeList_(k) {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty(STORES[k].prop + '_list') || '[]'); } catch (x) { return []; }
 }
 
 function digest_(s) {
   return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, s, Utilities.Charset.UTF_8));
 }
 
-function manualRead_(vid) {
-  const v = manualSheet_().getDataRange().getValues();
+function storeRead_(k, vid) {
+  const v = storeSheet_(k).getDataRange().getValues();
   return v.slice(1).filter(r => String(r[0]) === vid).sort((a, b) => Number(a[1]) - Number(b[1])).map(r => String(r[2])).join('');
 }
 
 // Tiene solo le righe delle versioni indicate.
-function manualPrune_(keep) {
-  const sh = manualSheet_(), v = sh.getDataRange().getValues();
+function storePrune_(k, keep) {
+  const sh = storeSheet_(k), v = sh.getDataRange().getValues();
   const rows = v.slice(1).filter(r => keep.indexOf(String(r[0])) >= 0);
   if (rows.length === v.length - 1) return;
   if (v.length > 1) sh.getRange(2, 1, v.length - 1, 3).clearContent();
   if (rows.length) sh.getRange(2, 1, rows.length, 3).setValues(rows.map(r => [String(r[0]), r[1], "'" + String(r[2])]));
 }
 
-function manualGet_(req) {
-  const cur = manualCur_();
+function storeGet_(k, req) {
+  const cur = storeCur_(k);
   if (!cur) return { ok: true, none: true };
   if (req.ver && String(req.ver) === cur) return { ok: true, same: true, ver: cur };
-  const info = manualList_().find(x => x.vid === cur) || { vid: cur };
-  const html = manualRead_(cur);
-  if (!html || (info.hash && digest_(html) !== info.hash)) fail_('Il Know How salvato nel foglio non è integro: chi ha il permesso può ripristinare una versione precedente', 'CORRUPT');
+  const info = storeList_(k).find(x => x.vid === cur) || { vid: cur };
+  const html = storeRead_(k, cur);
+  if (!html || (info.hash && digest_(html) !== info.hash)) fail_('Il file salvato nel foglio (' + STORES[k].name + ') non è integro: chi ha il permesso può ripristinare una versione precedente', 'CORRUPT');
   return { ok: true, ver: cur, info: { vid: cur, label: info.label || '', by: info.by || '', at: info.at || 0, len: html.length }, html: html };
 }
 
-function manualPut_(u, html) {
-  needPerm_(u, 'manuale');
+function storePut_(k, u, html) {
   html = String(html || '').replace(/\r\n?/g, '\n');
-  if (html.length < 500 || html.length > 8000000) fail_('Il file non sembra il manuale (dimensione non valida)', 'BAD_FILE');
-  const m = html.match(/DATA_VERSION\s*=\s*["']([^"']+)["']/);
+  if (html.length < 500 || html.length > 8000000) fail_('Il file non sembra valido (dimensione)', 'BAD_FILE');
+  const m = html.match(STORES[k].label);
   const vid = 'v' + Date.now();
   const rows = [];
-  for (let i = 0, k = 0; i < html.length; k++) {
+  for (let i = 0, n = 0; i < html.length; n++) {
     let j = Math.min(i + CHUNK, html.length);
     const c = html.charCodeAt(j - 1);
     if (j < html.length && c >= 0xD800 && c <= 0xDBFF) j--; // non spezzo le emoji a metà
-    rows.push([vid, k, "'" + html.slice(i, j)]);
+    rows.push([vid, n, "'" + html.slice(i, j)]);
     i = j;
   }
-  const sh = manualSheet_(), start = sh.getLastRow() + 1;
+  const sh = storeSheet_(k), start = sh.getLastRow() + 1;
   if (sh.getMaxRows() < start + rows.length) sh.insertRowsAfter(sh.getMaxRows(), start + rows.length - sh.getMaxRows());
   sh.getRange(start, 1, rows.length, 3).setValues(rows);
   SpreadsheetApp.flush();
   // Rileggo e confronto: pubblico solo se il foglio contiene esattamente il file caricato.
-  if (manualRead_(vid) !== html) {
-    manualPrune_(manualList_().map(x => x.vid));
+  if (storeRead_(k, vid) !== html) {
+    storePrune_(k, storeList_(k).map(x => x.vid));
     fail_('Il salvataggio nel foglio non è andato a buon fine: niente è cambiato, riprova', 'SAVE_FAILED');
   }
   const info = { vid: vid, label: m ? m[1] : '', by: u.nome, at: Date.now(), len: html.length, hash: digest_(html) };
-  const list = [info].concat(manualList_()).slice(0, KEEP_VERSIONS);
+  const list = [info].concat(storeList_(k)).slice(0, KEEP_VERSIONS);
   const p = PropertiesService.getScriptProperties();
-  p.setProperty('man_list', JSON.stringify(list));
-  p.setProperty('man_cur', vid);
-  manualPrune_(list.map(x => x.vid));
+  p.setProperty(STORES[k].prop + '_list', JSON.stringify(list));
+  p.setProperty(STORES[k].prop + '_cur', vid);
+  storePrune_(k, list.map(x => x.vid));
   return { ok: true, info: { vid: vid, label: info.label, by: info.by, at: info.at, len: info.len } };
 }
 
-function manualRestore_(u, vid) {
-  needPerm_(u, 'manuale');
-  if (!manualList_().some(x => x.vid === vid)) fail_('Versione non trovata', 'NOT_FOUND');
-  PropertiesService.getScriptProperties().setProperty('man_cur', String(vid));
+function storeRestore_(k, vid) {
+  if (!storeList_(k).some(x => x.vid === vid)) fail_('Versione non trovata', 'NOT_FOUND');
+  PropertiesService.getScriptProperties().setProperty(STORES[k].prop + '_cur', String(vid));
   return { ok: true };
 }
 

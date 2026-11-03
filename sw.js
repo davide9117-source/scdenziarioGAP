@@ -1,16 +1,16 @@
 // Service worker: permette di aprire l'app anche senza rete.
 // Prima prova la rete (così gli aggiornamenti arrivano subito), se manca usa la copia salvata.
-const CACHE = 'libreria-v7';
+const CACHE = 'libreria-v8';
 const FONTS = 'libreria-fonts';
-const SHELL = ['./', 'index.html', 'backend.js', 'config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
+const SHELL = ['./', 'index.html', 'app.html', 'backend.js', 'config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
-  // Tengo la cache dei caratteri e la copia del Know How (kh-*), che gestisce l'app.
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== FONTS && !k.startsWith('kh-')).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  // Tengo la cache dei caratteri e le copie di Know How (kh-*) e app pubblicata (app-*), gestite dall'app.
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== FONTS && !k.startsWith('kh-') && !k.startsWith('app-')).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
 self.addEventListener('fetch', e => {
